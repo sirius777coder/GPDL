@@ -1,6 +1,6 @@
 # ESM-Inpainting
 
- Using ESMFold to generate scaffold proteins for the functional sites.
+ Using ESMFold to generate scaffold proteins for the functional sites (which is also called inpainting). 
 
 
 -----
