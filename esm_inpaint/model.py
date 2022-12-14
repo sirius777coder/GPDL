@@ -2,6 +2,12 @@ import matplotlib.pyplot as plt
 import torch
 import esm
 from typing import List, Optional, Tuple
+from esm.data import BatchConverter
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import Sequence, Tuple, List
+
 
 # A number of functions/classes are adopted from: https://github.com/facebookresearch/esm
 

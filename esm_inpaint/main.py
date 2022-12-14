@@ -16,6 +16,31 @@ parser.add_argument('-n', '--num_design', type=int,
                     default=5, help="num of designs")
 args = parser.parse_args()
 
+
+restypes = [
+    "A",
+    "R",
+    "N",
+    "D",
+    "C",
+    "Q",
+    "E",
+    "G",
+    "H",
+    "I",
+    "L",
+    "K",
+    "M",
+    "F",
+    "P",
+    "S",
+    "T",
+    "W",
+    "Y",
+    "V",
+]
+restype_order = {restype: i for i, restype in enumerate(restypes)}
+restype_num = len(restypes)  # := 20.
 alphabet = {
     'ALA': 'A', 'VAL': 'V', 'PHE': 'F', 'PRO': 'P', 'MET': 'M',
     'ILE': 'I', 'LEU': 'L', 'ASP': 'D', 'GLU': 'E', 'LYS': 'K',
