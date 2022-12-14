@@ -120,7 +120,7 @@ def transform(v, R, t=None):
     Returns:
         Rotated version of v by rotation matrix R.
     Explain:
-        As R is a symmetrical matrix, torch.sum(v * R, dim = -2) is equal to (R @ v).squeeze(-1)
+        As R is a rotation matrix, torch.sum(v * R, dim = -2) is a  transpose matrix to (R @ v).squeeze(-1)
     """
     R = R.unsqueeze(-3)  # [B, L, 3, 3]        -> [B, L, 1, 3, 3]
     v = v.unsqueeze(-1)  # [B, L, channels, 3] -> [B, L, channels, 3 ,1 ]
