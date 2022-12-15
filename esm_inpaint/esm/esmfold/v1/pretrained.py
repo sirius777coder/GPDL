@@ -15,10 +15,10 @@ def _load_model(model_name):
 
     cfg = model_data["cfg"]["model"]
     model_state = model_data["model"]
-    model = ESMFold(esmfold_config=cfg)
+    model = ESMFold(esmfold_config=cfg) # bottleneck step
 
-    expected_keys = set(model.state_dict().keys())
-    found_keys = set(model_state.keys())
+    expected_keys = set(model.state_dict().keys()) # parameters in class instance
+    found_keys = set(model_state.keys()) # parameters in pt file
 
     missing_essential_keys = []
     for missing_key in expected_keys - found_keys:

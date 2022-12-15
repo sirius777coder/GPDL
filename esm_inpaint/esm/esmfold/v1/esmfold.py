@@ -119,6 +119,8 @@ class ESMFold(nn.Module):
 
     def forward(
         self,
+        dis_embed: torch.Tensor,
+        bb_frame: tuple(torch.Tensor,torch.Tensor),
         aa: torch.Tensor,
         mask: T.Optional[torch.Tensor] = None,
         residx: T.Optional[torch.Tensor] = None,
