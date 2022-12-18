@@ -5,5 +5,5 @@ Using ESMFold to generate scaffold proteins for the functional sites (which is a
 > make sure you hava already downloaded the weight files
 
 -----
-Author : Bo Zhang
+Author : Bo Zhang  
 E-mail : zhangbo777@sjtu.edu.cn
