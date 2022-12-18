@@ -1,7 +1,7 @@
 # A lot of functions are taken from
 # 1. https://github.com/facebookresearch/esm
 # 2. https://github.com/jingraham/neurips19-graph-protein-design
-# 3. OpenFold
+# 3. https://github.com/aqlaboratory/openfold
 
 # PS : here we use biotite to build our code blocks rather than bipython
 import json
@@ -20,9 +20,89 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
-from typing import Sequence, Tuple, List
-
+from typing import Sequence, Tuple, List, Optional,Iterable
+from openfold.utils.rigid_utils import Rotation, Rigid
 from esm.data import BatchConverter
+
+
+
+restypes = [
+    "A",
+    "R",
+    "N",
+    "D",
+    "C",
+    "Q",
+    "E",
+    "G",
+    "H",
+    "I",
+    "L",
+    "K",
+    "M",
+    "F",
+    "P",
+    "S",
+    "T",
+    "W",
+    "Y",
+    "V",
+]
+restype_order = {restype: i for i, restype in enumerate(restypes)}
+
+
+def recur_print(x):
+    if isinstance(x, torch.Tensor) or isinstance(x, np.ndarray):
+        return f"{x.shape}_{x.dtype}"
+    elif isinstance(x, dict):
+        return {k: recur_print(v) for k, v in x.items()}
+    elif isinstance(x, Iterable):
+        return [recur_print(v) for v in x]
+    else:
+        raise RuntimeError(x)
+
+def load_jsonl(json_file: str) -> list:
+    data = []
+    with open(json_file, "r") as f:
+        for line in f:
+            try:
+                # 每一行代表一个序列的字典字符串加一个'\n',对于字符串应该用json.loads()文件进行读取
+                data.append(json.loads(line.replace("\n", "")))
+            except ValueError:
+                pass
+    return data
+
+def identity(a:str, b:str) -> float:
+    """
+    identity of two strings 
+    """
+    return np.mean([i==j for i,j in zip(a,b)])
+
+def loss_nll(S, log_probs, mask):
+    """ Negative log probabilities from https://github.com/jingraham/neurips19-graph-protein-design/blob/master/experiments/utils.py
+    - input 
+        - S         : [B, N_res]
+        - log_probs : [B, N_res, 20]
+        - mask      : [B, N_res] 1 means compute loss while 0 doesn't
+    """
+    criterion = torch.nn.NLLLoss(reduction='none')
+    loss = criterion(
+        log_probs.contiguous().view(-1, log_probs.size(-1)), S.contiguous().view(-1)
+    ).view(S.size())
+    loss_av = torch.sum(loss * mask) / torch.sum(mask)
+    return loss, loss_av
+
+def loss_smoothed(S, log_probs, mask, weight=0.1):
+    """ Negative log probabilities """
+    S_onehot = torch.nn.functional.one_hot(S).float()
+
+    # Label smoothing
+    S_onehot = S_onehot + weight / float(S_onehot.size(-1))
+    S_onehot = S_onehot / S_onehot.sum(-1, keepdim=True)
+
+    loss = -(S_onehot * log_probs).sum(-1)
+    loss_av = torch.sum(loss * mask) / torch.sum(mask)
+    return loss, loss_av
 
 
 # Biotite module forthe pdb/cif structures
@@ -108,7 +188,7 @@ def get_atom_coords_residuewise(atoms: List[str], struct: biotite.structure.Atom
     return biotite.structure.apply_residue_wise(struct, struct, filterfn)
 
 
-# Frame and Rotation
+# Rotation and translation by tensor computation
 def transform(v, R, t=None):
     """
     Rotates a vector by a rotation matrix.
@@ -175,6 +255,142 @@ def nan_to_num(ts, val=0.0):
     val = torch.tensor(val, dtype=ts.dtype, device=ts.device)
     return torch.where(~torch.isfinite(ts), val, ts)
 
+
+
+# Rigid apply
+# rot_vec_mul : r[*, 3, 3] + point[*, 3] --> 最终会将point和frame的broadcast到相同维度
+
+def compute_fape(
+    pred_frames: Rigid,
+    target_frames: Rigid,
+    frames_mask: torch.Tensor,
+    pred_positions: torch.Tensor,
+    target_positions: torch.Tensor,
+    positions_mask: torch.Tensor,
+    length_scale: float,
+    l1_clamp_distance: Optional[float] = None,
+    eps=1e-8,
+) -> torch.Tensor:
+    """
+        Computes FAPE loss.
+        Args:
+            pred_frames:
+                [*, N_frames] Rigid object of predicted frames
+            target_frames:
+                [*, N_frames] Rigid object of ground truth frames
+            frames_mask:
+                [*, N_frames] binary mask for the frames
+            pred_positions: ---注意此时的N_pts是将所有的点落到一起
+                [*, N_pts, 3] predicted atom positions
+            target_positions:
+                [*, N_pts, 3] ground truth positions
+            positions_mask:
+                [*, N_pts] positions mask
+            length_scale:
+                Length scale by which the loss is divided
+            l1_clamp_distance:
+                Cutoff above which distance errors are disregarded
+            eps:
+                Small value used to regularize denominators
+        Returns:
+            [*] loss tensor
+    """
+
+    # [*, N_frames, N_pts, 3]
+    local_pred_pos = pred_frames.invert()[..., None].apply(
+        pred_positions[..., None, :, :],
+    ) #[B, N_frames, 1, 3, 3] apply [B, 1, N_points, 3]
+
+    local_target_pos = target_frames.invert()[..., None].apply(
+        target_positions[..., None, :, :],
+    )
+
+    error_dist = torch.sqrt(
+        torch.sum((local_pred_pos - local_target_pos) ** 2, dim=-1) + eps
+    )
+
+    if l1_clamp_distance is not None:
+        error_dist = torch.clamp(error_dist, min=0, max=l1_clamp_distance)
+
+    normed_error = error_dist / length_scale
+    normed_error = normed_error * frames_mask[..., None]
+    normed_error = normed_error * positions_mask[..., None, :]
+
+    # FP16-friendly averaging. Roughly equivalent to:
+    #
+    # norm_factor = (
+    #     torch.sum(frames_mask, dim=-1) *
+    #     torch.sum(positions_mask, dim=-1)
+    # )
+    # normed_error = torch.sum(normed_error, dim=(-1, -2)) / (eps + norm_factor)
+    #
+    # ("roughly" because eps is necessarily duplicated in the latter)
+    normed_error = torch.sum(normed_error, dim=-1)
+    normed_error = (
+        normed_error / (eps + torch.sum(frames_mask, dim=-1))[..., None]
+    )
+    normed_error = torch.sum(normed_error, dim=-1)
+    normed_error = normed_error / (eps + torch.sum(positions_mask, dim=-1))
+
+    return normed_error
+
+
+def backbone_loss(
+    backbone_rigid_tensor: torch.Tensor,
+    backbone_rigid_mask: torch.Tensor,
+    traj: torch.Tensor,
+    use_clamped_fape: Optional[torch.Tensor] = None,
+    clamp_distance: float = 10.0,
+    loss_unit_distance: float = 10.0,
+    eps: float = 1e-4,
+    **kwargs,
+) -> torch.Tensor:
+    pred_aff = Rigid.from_tensor_7(traj)
+    pred_aff = Rigid(
+        Rotation(rot_mats=pred_aff.get_rots().get_rot_mats(), quats=None),
+        pred_aff.get_trans(),
+    )
+
+    # DISCREPANCY: DeepMind somehow gets a hold of a tensor_7 version of
+    # backbone tensor, normalizes it, and then turns it back to a rotation
+    # matrix. To avoid a potentially numerically unstable rotation matrix
+    # to quaternion conversion, we just use the original rotation matrix
+    # outright. This one hasn't been composed a bunch of times, though, so
+    # it might be fine.
+    gt_aff = Rigid.from_tensor_4x4(backbone_rigid_tensor)
+
+    fape_loss = compute_fape(
+        pred_aff,
+        gt_aff[None],
+        backbone_rigid_mask[None],
+        pred_aff.get_trans(),
+        gt_aff[None].get_trans(),
+        backbone_rigid_mask[None],
+        l1_clamp_distance=clamp_distance,
+        length_scale=loss_unit_distance,
+        eps=eps,
+    )
+    if use_clamped_fape is not None:
+        unclamped_fape_loss = compute_fape(
+            pred_aff,
+            gt_aff[None],
+            backbone_rigid_mask[None],
+            pred_aff.get_trans(),
+            gt_aff[None].get_trans(),
+            backbone_rigid_mask[None],
+            l1_clamp_distance=None,
+            length_scale=loss_unit_distance,
+            eps=eps,
+        )
+
+        fape_loss = fape_loss * use_clamped_fape + unclamped_fape_loss * (
+            1 - use_clamped_fape
+        )
+
+    # Average over the batch dimension
+    fape_loss = torch.mean(fape_loss)
+
+    return 
 
 class CoordBatchConverter(BatchConverter):
     def __init__(self, alphabet, truncation_seq_length: int = None):
