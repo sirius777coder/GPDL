@@ -36,6 +36,7 @@ class StructureDataset(Dataset):
         self.data = []
         self.discard = {"bad_chars":0,"too_long":0}
         for entry in dataset:
+            name = entry['name']
             seq = entry['seq']
             # Check if in alphabet
             bad_chars = set([s for s in seq]).difference(restypes)
@@ -67,6 +68,7 @@ class StructureDataset(Dataset):
             mask_seq[~bert_mask] = 0
 
             self.data.append({
+                "name":name,
                 "coord":coord,
                 "seq":seq,
                 "mask_coord":mask_coord,
@@ -114,7 +116,7 @@ def batch_collate_function(batch):
     }
     return output
     
-def StructureDataloader(dataset,batch_size,num_workers,shuffle=True):
+def StructureDataloader(dataset,batch_size,num_workers=1,shuffle=True):
     """
     A wrap up dataloader
     """

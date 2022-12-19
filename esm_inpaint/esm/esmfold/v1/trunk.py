@@ -199,8 +199,8 @@ class FoldingTrunk(nn.Module):
         for recycle_idx in range(no_recycles):
             with ExitStack() if recycle_idx == no_recycles - 1 else torch.no_grad():
                 # === Recycling ===
-                print(f"Recycling:{recycle_idx}-----------")
-                print(f"Folding Trunk")
+                # print(f"Recycling:{recycle_idx}-----------")
+                # print(f"Folding Trunk")
                 recycle_s = self.recycle_s_norm(recycle_s.detach())
                 recycle_z = self.recycle_z_norm(recycle_z.detach())
                 recycle_z += self.recycle_disto(recycle_bins.detach())
@@ -211,7 +211,7 @@ class FoldingTrunk(nn.Module):
                 s_z = s_z.detach()
 
                 # === Structure module ===
-                print(f"Structure Module")
+                # print(f"Structure Module")
                 s_z += dis_embed
                 structure = self.structure_module(
                     {"single": self.trunk2sm_s(
@@ -220,7 +220,7 @@ class FoldingTrunk(nn.Module):
                     mask.float(),
                     initial_bb_frame = bb_frame
                 )
-                print(f"Recycling Output")
+                # print(f"Recycling Output")
                 recycle_s = s_s
                 recycle_z = s_z
                 # Distogram needs the N, CA, C coordinates, and bin constants same as alphafold.

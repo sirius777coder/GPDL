@@ -6,6 +6,10 @@ from esm.esmfold.v1.esmfold import ESMFold
 from openfold.utils.rigid_utils import Rigid
 import utils
 import numpy as np
+import pickle
+from collections import OrderdDict
+
+
 
 class ProteinFeatures(nn.Module):
     def __init__(self, embedding_dim, num_rbf=16, augment_eps=0.):
@@ -141,3 +145,14 @@ class esm_inpaint(nn.Module):
             # else:
             #     parameter.requires_grad = True
 
+    def inpaint_state_dict(self,path="./inpaint.pt"):
+        """
+        only 1,777,845 parameters will be saved
+        """
+        inpaint_parameters = OrderdDict()
+        for name,parameter in self.named_parameters():
+            if parameter.requires_grad:
+                inpaint_parameters[name] = parameter
+        return inpaint_parameters
+        # with open(path, 'wb') as file:
+        #     pickle.dump(inpaint_parameters, file)
