@@ -73,6 +73,7 @@ class esm_inpaint(nn.Module):
         self.esmfold.set_chunk_size(chunk_size)
         self.augment_eps = augment_eps
         self.ProteinFeatures = ProteinFeatures(cfg.trunk.pairwise_state_dim)
+        self._froezen()
 
     def forward(self,coord,mask,S):
         """
@@ -108,3 +109,35 @@ class esm_inpaint(nn.Module):
         output_ptm = structure['ptm']
         output_plddt = structure['plddt'][...,:3]
         return {"log_softmax_aa":output_seq, "target_frames":bb_frame ,"pred_frames": Rigid.from_tensor_7(output_frams) ,"positions":output_xyz , "ptm":output_ptm, "plddt":output_plddt}
+
+    def _froezen(self):
+        """
+        Only training the following part of the modules:
+        - ipa module
+        - bb updata
+        - transition
+        - lm-head
+        - ProteinFeatures
+        """
+        for name,parameter in self.named_parameters():
+            if name.startswith("esmfold.trunk.structure_module.ipa"):
+                parameter.requires_grad = True
+            elif name.startswith("esmfold.trunk.structure_module.transition"):
+                parameter.requires_grad = True
+            elif name.startswith("esmfold.trunk.structure_module.bb_update"):
+                parameter.requires_grad = True
+            elif name.startswith("ProteinFeatures"):
+                parameter.requires_grad = True
+            elif name.startswith("esmfold.lm_head"):
+                parameter.requires_grad = True
+            else:
+                parameter.requires_grad = False
+
+
+            # elif name.startwith("esmfold.trunk.blocks"):
+            #     parameter.requires_grad = False
+            # elif name.startswith("esmfold.trunk.structure_module"):
+            #     parameter.requires_grad = True
+            # else:
+            #     parameter.requires_grad = True
+

@@ -31,7 +31,7 @@ restypes = [
 restype_order = {restype: i for i, restype in enumerate(restypes)}
 
 class StructureDataset(Dataset):
-    def __init__(self,jsonl_file,truncate=None, max_length=500,low_fraction=0.3,high_fraction=0.6):
+    def __init__(self,jsonl_file,max_length=500,low_fraction=0.3,high_fraction=0.6):
         dataset = utils.load_jsonl(jsonl_file)
         self.data = []
         self.discard = {"bad_chars":0,"too_long":0}
@@ -46,7 +46,7 @@ class StructureDataset(Dataset):
                     self.discard['too_long'] += 1
                     continue
             else:
-                print(entry['name'], bad_chars, entry['seq'])
+                # print(entry['name'], bad_chars, entry['seq'])
                 self.discard['bad_chars'] += 1
                 continue
             seq = torch.tensor([restype_order[i] for i in seq],dtype=torch.long)
@@ -74,6 +74,7 @@ class StructureDataset(Dataset):
                 "bert_mask_fraction":bert_mask_fraction,
                 "bert_mask":bert_mask
             })
+        print(f"UNK token:{self.discard['bad_chars']},too long:{self.discard['too_long']}")
 
     def __len__(self):
         return len(self.data)
