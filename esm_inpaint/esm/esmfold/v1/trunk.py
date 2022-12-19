@@ -156,9 +156,11 @@ class FoldingTrunk(nn.Module):
         # where the chunk_size is the size of the chunks, so 128 would mean to parse 128-lengthed chunks.
         self.chunk_size = chunk_size
 
-    def forward(self, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, ):
+    def forward(self, dis_embed, bb_frame, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, ):
         """
         Inputs:
+          dis_embed:     B x L x L x C        tensor of distance embedding to the folding trunk
+          bb_tensor:     B x L x 4 x 4        tensor of the motif backbone tensors
           seq_feats:     B x L x C            tensor of sequence features
           pair_feats:    B x L x L x C        tensor of pair features
           residx:        B x L                long tensor giving the position in the sequence
@@ -193,26 +195,32 @@ class FoldingTrunk(nn.Module):
         recycle_z = torch.zeros_like(s_z)
         recycle_bins = torch.zeros(
             *s_z.shape[:-1], device=device, dtype=torch.int64)
-
         assert no_recycles > 0
         for recycle_idx in range(no_recycles):
             with ExitStack() if recycle_idx == no_recycles - 1 else torch.no_grad():
                 # === Recycling ===
+                print(f"Recycling:{recycle_idx}-----------")
+                print(f"Folding Trunk")
                 recycle_s = self.recycle_s_norm(recycle_s.detach())
                 recycle_z = self.recycle_z_norm(recycle_z.detach())
                 recycle_z += self.recycle_disto(recycle_bins.detach())
-
                 s_s, s_z = trunk_iter(
                     s_s_0 + recycle_s, s_z_0 + recycle_z, residx, mask)
+                # Folding trunk doesn't need grad
+                s_s = s_s.detach()
+                s_z = s_z.detach()
 
                 # === Structure module ===
+                print(f"Structure Module")
+                s_z += dis_embed
                 structure = self.structure_module(
                     {"single": self.trunk2sm_s(
                         s_s), "pair": self.trunk2sm_z(s_z)},
                     true_aa,
                     mask.float(),
+                    initial_bb_frame = bb_frame
                 )
-
+                print(f"Recycling Output")
                 recycle_s = s_s
                 recycle_z = s_z
                 # Distogram needs the N, CA, C coordinates, and bin constants same as alphafold.

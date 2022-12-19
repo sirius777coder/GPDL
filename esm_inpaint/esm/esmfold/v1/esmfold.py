@@ -120,7 +120,7 @@ class ESMFold(nn.Module):
     def forward(
         self,
         dis_embed: torch.Tensor,
-        bb_frame: tuple(torch.Tensor,torch.Tensor),
+        bb_frame: torch.Tensor,
         aa: torch.Tensor,
         mask: T.Optional[torch.Tensor] = None,
         residx: T.Optional[torch.Tensor] = None,
@@ -176,7 +176,7 @@ class ESMFold(nn.Module):
         s_s_0 += self.embedding(aa)
 
         structure: dict = self.trunk(
-            s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
+            dis_embed, bb_frame, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
         # Documenting what we expect:
         structure = {
             k: v
@@ -194,22 +194,22 @@ class ESMFold(nn.Module):
             ]
         }
 
-        disto_logits = self.distogram_head(structure["s_z"])
-        disto_logits = (disto_logits + disto_logits.transpose(1, 2)) / 2
-        structure["distogram_logits"] = disto_logits
+        # disto_logits = self.distogram_head(structure["s_z"])
+        # disto_logits = (disto_logits + disto_logits.transpose(1, 2)) / 2
+        # structure["distogram_logits"] = disto_logits
 
         lm_logits = self.lm_head(structure["s_s"])
         structure["lm_logits"] = lm_logits
 
         structure["aatype"] = aa
-        make_atom14_masks(structure)
+        # make_atom14_masks(structure)
 
-        for k in [
-            "atom14_atom_exists",
-            "atom37_atom_exists",
-        ]:
-            structure[k] *= mask.unsqueeze(-1)
-        structure["residue_index"] = residx
+        # for k in [
+        #     "atom14_atom_exists",
+        #     "atom37_atom_exists",
+        # ]:
+        #     structure[k] *= mask.unsqueeze(-1)
+        # structure["residue_index"] = residx
 
         lddt_head = self.lddt_head(structure["states"]).reshape(
             structure["states"].shape[0], B, L, -1, self.lddt_bins

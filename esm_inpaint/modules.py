@@ -53,20 +53,30 @@ class ProteinFeatures(nn.Module):
                 rbf_dist = self.rbf(dist) # [B, L, L, 16]
                 RBF_all.append(rbf_dist)
         RBF_all = torch.cat(tuple(RBF_all), dim=-1) # [B, L, L, 16*25]
+        print(RBF_all.dtype)
         E = self.edge_embedding(RBF_all)
-        mask_2d = mask[:,:,1] * mask[:,1,:] # [B, L, L]
+        mask_2d = mask[:,:,None] * mask[:,None,:] # [B, L, L]
         mask_2d = mask_2d.unsqueeze(-1)
         return E * mask_2d
 
 class esm_inpaint(nn.Module):
-    def __init__(self,cfg,*args,**kwargs):
+    def __init__(self,cfg):
         super().__init__()
         self.esmfold = ESMFold(cfg)
-        self.ProteinFeatures(cfg.pairwise_state_dim)
+        self.ProteinFeatures = ProteinFeatures(cfg.trunk.pairwise_state_dim)
     
-    def forward(self,coord,S,mask,*args,**kwargs):
+    def forward(self,coord,mask,S):
+        coord = utils.nan_to_num(coord)
         dis_embed = self.ProteinFeatures(coord,mask)
         bb_frame_atom = coord[:,:,0:3,:]
-        bb_frame = utils.get_bb_frames(bb_frame_atom)
-        structure = self.esmfold(dis_embed,bb_frame,*args,**kwargs)
+        bb_rotation,bb_translation = utils.get_bb_frames(bb_frame_atom)
+        mask_frame = mask.reshape(*mask.shape,1,1)
+        mask_frame = mask_frame.expand(*mask_frame.shape[:-2],4,4)
+        bb_frame = torch.zeros((*bb_rotation.shape[:-2],4,4),device=coord.device)
+        bb_frame[...,:3,:3] = bb_rotation
+        bb_frame[...,:3,3] = bb_translation # [B, L, 4, 4]
+        bb_frame = bb_frame * mask_frame
+        print(f"coord {coord.device}\n mask {coord.device}\n mask_frame {mask.device}\nembedding {dis_embed.device}\n bb_frame {bb_frame.device}")
+        print(dis_embed.shape)
+        structure = self.esmfold(dis_embed,bb_frame,S,mask)
         return structure
