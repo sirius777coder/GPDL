@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from esm.esmfold.v1.trunk import FoldingTrunk
 from esm.esmfold.v1.esmfold import ESMFold
+from openfold.utils.rigid_utils import Rigid
 import utils
 import numpy as np
 
@@ -60,14 +62,32 @@ class ProteinFeatures(nn.Module):
         return E * mask_2d
 
 class esm_inpaint(nn.Module):
-    def __init__(self,cfg):
+    def __init__(self,cfg,chunk_size=128,augment_eps=0.02):
+        """
+        cfg is the defaulted input information to the esmfold
+        """
         super().__init__()
         self.esmfold = ESMFold(cfg)
+        self.cfg=cfg
+        self.chunk_size=chunk_size
+        self.esmfold.set_chunk_size(chunk_size)
+        self.augment_eps = augment_eps
         self.ProteinFeatures = ProteinFeatures(cfg.trunk.pairwise_state_dim)
-    
+
     def forward(self,coord,mask,S):
-        coord = utils.nan_to_num(coord)
+        """
+        coord : [B, L, 4, 3]_float32
+        mask  : [B, L]_float32, 0 means padding mask and no loss, 1 means no padding mask and compute the loss
+        S     : [B, L]_long
+        """
+        # Data augmentation by gaussian noise
+        if self.training and self.augment_eps > 0:
+            coord = coord + self.augment_eps * torch.randn_like(coord)
+        
+        # add the distance embedding features
         dis_embed = self.ProteinFeatures(coord,mask)
+
+        # convert the coord to global frames
         bb_frame_atom = coord[:,:,0:3,:]
         bb_rotation,bb_translation = utils.get_bb_frames(bb_frame_atom)
         mask_frame = mask.reshape(*mask.shape,1,1)
@@ -76,7 +96,15 @@ class esm_inpaint(nn.Module):
         bb_frame[...,:3,:3] = bb_rotation
         bb_frame[...,:3,3] = bb_translation # [B, L, 4, 4]
         bb_frame = bb_frame * mask_frame
-        print(f"coord {coord.device}\n mask {coord.device}\n mask_frame {mask.device}\nembedding {dis_embed.device}\n bb_frame {bb_frame.device}")
-        print(dis_embed.shape)
+        bb_frame = Rigid.from_tensor_4x4(bb_frame)
+
+        # running the esmfold 
         structure = self.esmfold(dis_embed,bb_frame,S,mask)
-        return structure
+
+        # refine the output
+        output_seq = F.log_softmax(structure['lm_logits'])
+        output_frams = structure['frames'][-1]
+        output_xyz = structure['positions'][-1,...,:3,:3]
+        output_ptm = structure['ptm']
+        output_plddt = structure['plddt'][...,:3]
+        return {"log_softmax_aa":output_seq, "target_frames":bb_frame ,"pred_frames": Rigid.from_tensor_7(output_frams) ,"positions":output_xyz , "ptm":output_ptm, "plddt":output_plddt}

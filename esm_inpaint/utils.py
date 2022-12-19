@@ -267,7 +267,7 @@ def compute_fape(
     pred_positions: torch.Tensor,
     target_positions: torch.Tensor,
     positions_mask: torch.Tensor,
-    length_scale: float,
+    length_scale: 10.0,
     l1_clamp_distance: Optional[float] = None,
     eps=1e-8,
 ) -> torch.Tensor:
@@ -280,7 +280,7 @@ def compute_fape(
                 [*, N_frames] Rigid object of ground truth frames
             frames_mask:
                 [*, N_frames] binary mask for the frames
-            pred_positions: ---注意此时的N_pts是将所有的点落到一起
+            pred_positions: ---注意此时的N_pts是将所有每个序列里所有氨基酸落到一起 -- N_res * N_points
                 [*, N_pts, 3] predicted atom positions
             target_positions:
                 [*, N_pts, 3] ground truth positions
@@ -299,12 +299,13 @@ def compute_fape(
     # [*, N_frames, N_pts, 3]
     local_pred_pos = pred_frames.invert()[..., None].apply(
         pred_positions[..., None, :, :],
-    ) #[B, N_frames, 1, 3, 3] apply [B, 1, N_points, 3]
+    ) # frame [B, N_frames, 1, 3, 3] apply points [B, 1, N_points, 3] -> SE(3) opertaion points: [B, N_frames, N_points, 3]
 
     local_target_pos = target_frames.invert()[..., None].apply(
         target_positions[..., None, :, :],
     )
 
+    # [*, N_frames, N_pts]
     error_dist = torch.sqrt(
         torch.sum((local_pred_pos - local_target_pos) ** 2, dim=-1) + eps
     )
@@ -313,7 +314,13 @@ def compute_fape(
         error_dist = torch.clamp(error_dist, min=0, max=l1_clamp_distance)
 
     normed_error = error_dist / length_scale
+
+    # [*, N_frames, N_pts]
+    # [B, N_frames, N_pts] * [B, N_frames, 1] --- mask the padding frames
     normed_error = normed_error * frames_mask[..., None]
+
+    # [*, N_frames, N_pts]
+    # [*, N_frames, N_pts] * [*, 1, N_pts] 
     normed_error = normed_error * positions_mask[..., None, :]
 
     # FP16-friendly averaging. Roughly equivalent to:
@@ -325,10 +332,20 @@ def compute_fape(
     # normed_error = torch.sum(normed_error, dim=(-1, -2)) / (eps + norm_factor)
     #
     # ("roughly" because eps is necessarily duplicated in the latter)
+
+    # summation over all the points for a single relative frame transformation,and divide the atom numbers
+    # [B, N_frames]
+    # 1. sum the atoms [B, N_frames, N_points] -> [B, N_frames]
+    # 2. divide the frame numbers [B, N_frames]/[B,1] ?
     normed_error = torch.sum(normed_error, dim=-1)
     normed_error = (
         normed_error / (eps + torch.sum(frames_mask, dim=-1))[..., None]
     )
+
+    # summation over all the relative transofmations
+    # [B,]
+    # 3. sum the relative frames [B,]
+    # 4. divide the atom positions ?
     normed_error = torch.sum(normed_error, dim=-1)
     normed_error = normed_error / (eps + torch.sum(positions_mask, dim=-1))
 
