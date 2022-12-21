@@ -51,6 +51,13 @@ restypes = [
 restype_order = {restype: i for i, restype in enumerate(restypes)}
 
 
+def move_batch(batch,device=torch.device("cuda")):
+    batch = {
+        k: torch.as_tensor(v, device=device)
+        for k, v in batch.items()
+    }
+    return batch
+
 def recur_print(x):
     if isinstance(x, torch.Tensor) or isinstance(x, np.ndarray):
         return f"{x.shape}_{x.dtype}"

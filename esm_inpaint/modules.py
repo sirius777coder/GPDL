@@ -7,7 +7,7 @@ from openfold.utils.rigid_utils import Rigid
 import utils
 import numpy as np
 import pickle
-from collections import OrderdDict
+from collections import OrderedDict
 
 
 
@@ -59,7 +59,7 @@ class ProteinFeatures(nn.Module):
                 rbf_dist = self.rbf(dist) # [B, L, L, 16]
                 RBF_all.append(rbf_dist)
         RBF_all = torch.cat(tuple(RBF_all), dim=-1) # [B, L, L, 16*25]
-        print(RBF_all.dtype)
+        # print(RBF_all.dtype)
         E = self.edge_embedding(RBF_all)
         mask_2d = mask[:,:,None] * mask[:,None,:] # [B, L, L]
         mask_2d = mask_2d.unsqueeze(-1)
@@ -145,11 +145,11 @@ class esm_inpaint(nn.Module):
             # else:
             #     parameter.requires_grad = True
 
-    def inpaint_state_dict(self,path="./inpaint.pt"):
+    def inpaint_state_dict(self):
         """
         only 1,777,845 parameters will be saved
         """
-        inpaint_parameters = OrderdDict()
+        inpaint_parameters = OrderedDict()
         for name,parameter in self.named_parameters():
             if parameter.requires_grad:
                 inpaint_parameters[name] = parameter
