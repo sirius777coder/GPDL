@@ -27,7 +27,6 @@ class ProteinFeatures(nn.Module):
         rbf_centers = torch.linspace(v_min, v_max, self.num_rbf, device=values.device)
         rbf_centers = rbf_centers.view([1] * len(values.shape) + [-1]) # view (*(1,)*len(values.shape),-1)
         rbf_std = (v_max - v_min) / self.num_rbf
-        v_expand = torch.unsqueeze(values, -1)
         z = (values.unsqueeze(-1) - rbf_centers) / rbf_std
         return torch.exp(-z ** 2)
 
@@ -66,7 +65,7 @@ class ProteinFeatures(nn.Module):
         return E * mask_2d
 
 class esm_inpaint(nn.Module):
-    def __init__(self,cfg,chunk_size=128,augment_eps=0.02):
+    def __init__(self,cfg,chunk_size=128,augment_eps=0.02,vocab=20):
         """
         cfg is the defaulted input information to the esmfold
         """
@@ -74,9 +73,10 @@ class esm_inpaint(nn.Module):
         self.esmfold = ESMFold(cfg)
         self.cfg=cfg
         self.chunk_size=chunk_size
-        self.esmfold.set_chunk_size(chunk_size)
+        self.esmfold.set_chunk_size(chunk_size) 
         self.augment_eps = augment_eps
         self.ProteinFeatures = ProteinFeatures(cfg.trunk.pairwise_state_dim)
+        self.seq_output = nn.Linear(cfg.trunk.sequence_state_dim,vocab)
         self._froezen()
 
     def forward(self,coord,mask,S):
@@ -107,7 +107,7 @@ class esm_inpaint(nn.Module):
         structure = self.esmfold(dis_embed,bb_frame,S,mask)
 
         # refine the output
-        output_seq = F.log_softmax(structure['lm_logits'])
+        output_seq = F.log_softmax(self.seq_output(structure['s_s'],dim=-1))
         output_frams = structure['frames'][-1]
         output_xyz = structure['positions'][-1,...,:3,:3]
         output_ptm = structure['ptm']
@@ -132,7 +132,7 @@ class esm_inpaint(nn.Module):
                 parameter.requires_grad = True
             elif name.startswith("ProteinFeatures"):
                 parameter.requires_grad = True
-            elif name.startswith("esmfold.lm_head"):
+            elif name.startswith("seq_output"):
                 parameter.requires_grad = True
             else:
                 parameter.requires_grad = False
