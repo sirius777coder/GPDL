@@ -23,9 +23,8 @@ import modules
 parser = ArgumentParser(description='ESM-Inpainting model')
 parser.add_argument('--temperature', type=float, default=1.0, help='Temperature to sample an amino acid')
 parser.add_argument('--noise', type=float, default=0.1, help='Add noise in training')
-parser.add_argument('--lr',type=float,default=0.0001, help="learning rate of Adam optimizer")
+parser.add_argument('--lr',type=float,default=1e-3, help="learning rate of Adam optimizer")
 parser.add_argument('--project_name', type=str,default="poc-esm-inpaint",help="project name in wandb")
-parser.add_argument('--project_entity', type=str,default="poc v1.0",help="project entity run name")
 parser.add_argument('--data_jsonl', type=str,help='Path for the jsonl data')
 parser.add_argument('--split_json', type=str, help='Path for the split json file')
 parser.add_argument('--save_folder',type=str,default="./",help="output folder for the model parameters")
@@ -94,9 +93,10 @@ best_val_loss = float('inf')
 best_model = None
 best_model_idx = 0
 
-wandb.init(project=args.project_name,config=config,entity=args.entity)
+wandb.init(project=args.project_name,config=config)
 print("start training...")
 start_time = time.time()
+
 for epoch in range(args.epochs):
     # Training epoch
     model.train()
@@ -123,12 +123,12 @@ for epoch in range(args.epochs):
         position_mask = torch.ones_like(target_position[...,0])
         fape_loss = torch.mean(utils.compute_fape(output['pred_frames'],output['target_frames'],batch['padding_mask'],pred_position,target_position,position_mask,10.0))
 
-        # loss = 0.5*fape + 4*cse copy from DeepMind AlphaFold2 loss function
-        loss = 4 * loss_seq + 0.5 * fape_loss
+        # loss = 0.5*fape + 2*cse copy from DeepMind AlphaFold2 loss function
+        loss = 2 * loss_seq + 0.5 * fape_loss
         optimizer.step()
         
         # log the loss terms
-        metric = {'TRAIN/ppl': ppl, 'TRAIN/fape': fape_loss, "TRAIN/ave_loss":loss, "TRAIN/epoch":epoch}
+        metric = {"TRAIN/ppl":ppl,'TRAIN/fape': fape_loss, "TRAIN/ave_loss":loss, "TRAIN/epoch":epoch}
         wandb.log(metric)
         total_loss += loss.item()
         total_loss_seq += loss_seq.item()
@@ -141,7 +141,7 @@ for epoch in range(args.epochs):
             cur_loss_ppl = np.exp(cur_loss_seq)
             print(f'| epoch {epoch:3d} | {iteration:5d}/{len(loader_train):5d} batches | '
                   f'| ms/batch {ms_per_batch:5.2f} | '
-                  f'loss {cur_loss:5.2f} | ppl {ppl:8.2f} | {cur_loss_fape:5.2f}')
+                  f'loss {cur_loss:5.2f} | ppl {cur_loss_ppl:5.2f} | {cur_loss_fape:5.2f}')
             total_loss = 0
             total_loss_seq = 0
             total_loss_fape = 0
@@ -210,8 +210,8 @@ with torch.no_grad():
         target_position = batch['coord'][:,:,:3,:].reshape(B, -1 ,3)
         position_mask = torch.ones_like(target_position[...,0])
         fape_loss = torch.mean(utils.compute_fape(output['pred_frames'],output['target_frames'],batch['padding_mask'],pred_position,target_position,position_mask,10.0))
-        # loss = 0.5*fape + 0.2*cse copy from DeepMind AlphaFold2 loss function
-        loss = 2 * loss_seq + 0.5 * fape_loss            
+        # loss = 2*fape + 0.2*cse copy from DeepMind AlphaFold2 loss function
+        loss =2 * loss_seq + 0.5 * fape_loss            
         test_loss += loss.item()
         test_seq += loss_seq.item()
         test_fape += fape_loss.item()

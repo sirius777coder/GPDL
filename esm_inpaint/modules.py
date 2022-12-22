@@ -65,7 +65,7 @@ class ProteinFeatures(nn.Module):
         return E * mask_2d
 
 class esm_inpaint(nn.Module):
-    def __init__(self,cfg,chunk_size=128,augment_eps=0.02,vocab=20):
+    def __init__(self,cfg,chunk_size=128,augment_eps=0.02):
         """
         cfg is the defaulted input information to the esmfold
         """
@@ -73,10 +73,15 @@ class esm_inpaint(nn.Module):
         self.esmfold = ESMFold(cfg)
         self.cfg=cfg
         self.chunk_size=chunk_size
-        self.esmfold.set_chunk_size(chunk_size) 
+        self.esmfold.set_chunk_size(chunk_size)
         self.augment_eps = augment_eps
         self.ProteinFeatures = ProteinFeatures(cfg.trunk.pairwise_state_dim)
-        self.seq_output = nn.Linear(cfg.trunk.sequence_state_dim,vocab)
+        self.seq_project = nn.Linear(cfg.trunk.sequence_state_dim,20)
+        # self.seq_project1 = nn.Linear(cfg.trunk.sequence_state_dim,128)
+        # self.seq_project2 = nn.Linear(128,20)
+        self.norm1 = nn.LayerNorm(cfg.trunk.sequence_state_dim)
+        self.norm2 = nn.LayerNorm(128)
+
         self._froezen()
 
     def forward(self,coord,mask,S):
@@ -107,12 +112,26 @@ class esm_inpaint(nn.Module):
         structure = self.esmfold(dis_embed,bb_frame,S,mask)
 
         # refine the output
-        output_seq = F.log_softmax(self.seq_output(structure['s_s'],dim=-1))
+        # seq = self.seq_project1(self.norm1(structure['s_s']))
+        # seq = self.seq_project2(self.norm2(seq))
+        seq = self.seq_project(self.norm1(structure['s_s']))
+        output_seq = F.log_softmax(seq,dim=-1)
+        # output_seq = F.log_softmax(structure['lm_logits'],dim=-1)
         output_frams = structure['frames'][-1]
         output_xyz = structure['positions'][-1,...,:3,:3]
         output_ptm = structure['ptm']
         output_plddt = structure['plddt'][...,:3]
-        return {"log_softmax_aa":output_seq, "target_frames":bb_frame ,"pred_frames": Rigid.from_tensor_7(output_frams) ,"positions":output_xyz , "ptm":output_ptm, "plddt":output_plddt}
+        output = {
+            "log_softmax_aa":output_seq, 
+            "target_frames":bb_frame ,
+            "pred_frames": Rigid.from_tensor_7(output_frams) ,
+            "positions":output_xyz , 
+            "ptm":output_ptm, 
+            "plddt":output_plddt,
+            "s_s":structure['s_s'],
+            "s_z":structure['s_z']
+        }
+        return output
 
     def _froezen(self):
         """
@@ -132,18 +151,12 @@ class esm_inpaint(nn.Module):
                 parameter.requires_grad = True
             elif name.startswith("ProteinFeatures"):
                 parameter.requires_grad = True
-            elif name.startswith("seq_output"):
+            elif name.startswith("esmfold.lm_head"):
+                parameter.requires_grad = True
+            elif name.startswith("seq_project"):
                 parameter.requires_grad = True
             else:
                 parameter.requires_grad = False
-
-
-            # elif name.startwith("esmfold.trunk.blocks"):
-            #     parameter.requires_grad = False
-            # elif name.startswith("esmfold.trunk.structure_module"):
-            #     parameter.requires_grad = True
-            # else:
-            #     parameter.requires_grad = True
 
     def inpaint_state_dict(self):
         """

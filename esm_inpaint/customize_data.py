@@ -65,7 +65,7 @@ class StructureDataset(Dataset):
             mask_coord = copy.deepcopy(coord)
             mask_coord[~bert_mask] = 0.0 # zero the mask backbone
             mask_seq = copy.deepcopy(seq)
-            mask_seq[~bert_mask] = 0
+            mask_seq[~bert_mask] = 20
 
             self.data.append({
                 "name":name,
@@ -98,12 +98,14 @@ def batch_collate_function(batch):
             padding_mask_batch       [B, L]  dtype=torch.float32   0 represents mask, 1 no mask
     """
     coord_batch = utils.CoordBatchConverter.collate_dense_tensors([i['coord'] for i in batch],0.0)
-    seq_batch = utils.CoordBatchConverter.collate_dense_tensors([i['seq'] for i in batch],20)
+    seq_batch = utils.CoordBatchConverter.collate_dense_tensors([i['seq'] for i in batch],-1)
     mask_coord_batch = utils.CoordBatchConverter.collate_dense_tensors([i['mask_coord'] for i in batch],0.0)
-    mask_seq_batch = utils.CoordBatchConverter.collate_dense_tensors([i['mask_seq'] for i in batch],20)
+    mask_seq_batch = utils.CoordBatchConverter.collate_dense_tensors([i['mask_seq'] for i in batch],-1)
     bert_mask_fraction_batch = utils.CoordBatchConverter.collate_dense_tensors([i['bert_mask_fraction'] for i in batch],0.0)
     bert_mask_batch = utils.CoordBatchConverter.collate_dense_tensors([i['bert_mask'] for i in batch],0.0)
-    padding_mask_batch = seq_batch!=20 #True not mask, False represents mask
+    padding_mask_batch = seq_batch!=-1 # True not mask, False represents mask
+    seq_batch[~padding_mask_batch] = 0 # padding to 0
+    mask_seq_batch[~padding_mask_batch] = 0 # padding to 0
     padding_mask_batch = padding_mask_batch.to(torch.float32)
     output = {
         "coord":coord_batch,
