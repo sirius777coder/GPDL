@@ -118,7 +118,7 @@ def batch_collate_function(batch):
     }
     return output
     
-def StructureDataloader(dataset,batch_size,num_workers=1,shuffle=True):
+def StructureDataloader(dataset,batch_size,num_workers=0,shuffle=True):
     """
     A wrap up dataloader
     """

@@ -65,7 +65,7 @@ class ProteinFeatures(nn.Module):
         return E * mask_2d
 
 class esm_inpaint(nn.Module):
-    def __init__(self,cfg,chunk_size=128,augment_eps=0.02):
+    def __init__(self,cfg,chunk_size=128,augment_eps=0.02,pattern="min"):
         """
         cfg is the defaulted input information to the esmfold
         """
@@ -82,7 +82,7 @@ class esm_inpaint(nn.Module):
         self.norm1 = nn.LayerNorm(cfg.trunk.sequence_state_dim)
         self.norm2 = nn.LayerNorm(128)
 
-        self._froezen()
+        self._froezen(patern=pattern)
 
     def forward(self,coord,mask,S):
         """
@@ -133,7 +133,7 @@ class esm_inpaint(nn.Module):
         }
         return output
 
-    def _froezen(self):
+    def _froezen(self,patern="min"):
         """
         Only training the following part of the modules:
         - ipa module
@@ -142,25 +142,37 @@ class esm_inpaint(nn.Module):
         - lm-head
         - ProteinFeatures
         """
-        for name,parameter in self.named_parameters():
-            if name.startswith("esmfold.trunk.structure_module.ipa"):
-                parameter.requires_grad = True
-            elif name.startswith("esmfold.trunk.structure_module.transition"):
-                parameter.requires_grad = True
-            elif name.startswith("esmfold.trunk.structure_module.bb_update"):
-                parameter.requires_grad = True
-            elif name.startswith("ProteinFeatures"):
-                parameter.requires_grad = True
-            elif name.startswith("esmfold.lm_head"):
-                parameter.requires_grad = True
-            elif name.startswith("seq_project"):
-                parameter.requires_grad = True
-            else:
-                parameter.requires_grad = False
+        if patern == "max":
+            for name,parameter in self.named_parameters():
+                if name.startswith("esmfold.trunk.structure_module.ipa"):
+                    parameter.requires_grad = True
+                elif name.startswith("esmfold.trunk.structure_module.transition"):
+                    parameter.requires_grad = True
+                elif name.startswith("esmfold.trunk.structure_module.bb_update"):
+                    parameter.requires_grad = True
+                elif name.startswith("ProteinFeatures"):
+                    parameter.requires_grad = True
+                elif name.startswith("esmfold.lm_head"):
+                    parameter.requires_grad = True
+                elif name.startswith("seq_project"):
+                    parameter.requires_grad = True
+                else:
+                    parameter.requires_grad = False
+        elif patern == "min":
+            for name,parameter in self.named_parameters():
+                if name.startswith("ProteinFeatures"):
+                    parameter.requires_grad = True
+                elif name.startswith("esmfold.lm_head"):
+                    parameter.requires_grad = True
+                elif name.startswith("seq_project"):
+                    parameter.requires_grad = True
+                else:
+                    parameter.requires_grad = False
+
 
     def inpaint_state_dict(self):
         """
-        only 1,777,845 parameters will be saved
+        only the training parameters will be saved
         """
         inpaint_parameters = OrderedDict()
         for name,parameter in self.named_parameters():
