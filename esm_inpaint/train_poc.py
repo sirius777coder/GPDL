@@ -39,8 +39,7 @@ def get_args():
     parser.add_argument('--chunk_size',type=int,default=64,help="chunk size of the model")
     parser.add_argument('--max_length',type=int,default=300,help="max length of the dataset")
     parser.add_argument("--local_rank", type=int, help="Local rank. Necessary for using the torch.distributed.launch utility.")
-    parser.add_argument("--ddp_train", type=bool, default=False, help="whether to use ddp training model")
-    
+    parser.add_argument("--ddp_train", default=False, action='store_true', help="whether to use ddp training model")
 
 
     args = parser.parse_args()
@@ -405,4 +404,7 @@ def ddp_main(args):
 
 if __name__ == "__main__":
     args = get_args()
-    main(args)
+    if args.ddp_train:
+        ddp_main(args)
+    else:
+        main(args)
