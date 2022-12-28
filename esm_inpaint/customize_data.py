@@ -118,11 +118,11 @@ def batch_collate_function(batch):
     }
     return output
     
-def StructureDataloader(dataset,batch_size,num_workers=0,shuffle=True):
+def StructureDataloader(dataset,batch_size,num_workers=0,sampler=None,shuffle=True):
     """
     A wrap up dataloader
     """
-    return DataLoader(dataset,batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,collate_fn=batch_collate_function)
+    return DataLoader(dataset,batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,sampler=sampler,collate_fn=batch_collate_function)
 
 
 class TokenDataloader():
