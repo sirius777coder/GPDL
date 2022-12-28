@@ -51,6 +51,14 @@ restypes = [
 restype_order = {restype: i for i, restype in enumerate(restypes)}
 
 
+def trainable_parameters(parameters):
+    num_para = 0
+    for parameter in parameters():
+        if parameter.grad is not None:
+            num_para += parameter.numel()
+    return num_para
+
+
 def move_batch(batch,device=torch.device("cuda")):
     batch = {
         k: torch.as_tensor(v, device=device)

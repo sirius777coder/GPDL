@@ -41,6 +41,7 @@ def get_args():
     parser.add_argument('--max_length',type=int,default=300,help="max length of the dataset")
     parser.add_argument("--local_rank", type=int, help="Local rank. Necessary for using the torch.distributed.launch utility.")
     parser.add_argument("--ddp_train", default=True, action='store_true', help="whether to use ddp training model")
+    # parser.add_argument("--fape_loss", default=False, action='store_true', help="whether to use fape loss")
 
 
     args = parser.parse_args()
@@ -139,6 +140,9 @@ def main(args):
 
             # loss = 0.5*fape + 2*cse copy from DeepMind AlphaFold2 loss function
             loss = 2 * loss_seq + 0.5 * fape_loss
+            # if epoch == 0 and iteration == 0:
+            #     print(f"{local_rank} parameters,{utils.trainable_parameters(model.parameter)}")
+            loss.backward()
             optimizer.step()
             
             # log the loss terms
@@ -173,7 +177,7 @@ def main(args):
                 log_pred = output['log_softmax_aa']
                 padding_mask = batch['padding_mask']
                 loss_seq_token, loss_seq = utils.loss_nll(batch['seq'], log_pred, padding_mask)
-
+                
                 # structure loss (fape)
                 B,L = output['positions'].shape[:2]
                 pred_position = output['positions'].reshape(B, -1, 3)
@@ -236,9 +240,9 @@ def main(args):
     print(f"Perplexity\tTest{np.exp(test_seq.cpu().data.numpy()) :.4f}\nFape\t{test_fape :.4f}\nLoss\t{test_loss :.4f}")
 
 
-def reduce_mean(tensor, nprocs):  # 用于平均所有gpu上的运行结果，比如loss
+def reduce_mean(tensor, nprocs,device):  # 用于平均所有gpu上的运行结果，比如loss
     if not isinstance(tensor,torch.Tensor):
-        tensor = torch.as_tensor(tensor)
+        tensor = torch.as_tensor(tensor,device=device)
     rt = tensor.clone()
     dist.all_reduce(rt, op=dist.ReduceOp.SUM)
     rt /= nprocs
@@ -295,12 +299,11 @@ def ddp_main(args):
     model.esmfold.load_state_dict(model_state, strict=False)
     # model to cuda
     model = model.to(device)
-    # define the optimizer
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-
+    
     # DDP方式初始化模型,这种方式会在模型的key上带上"module"
     ddp_model = torch.nn.parallel.DistributedDataParallel(
         model, device_ids=[local_rank], output_device=local_rank,find_unused_parameters=True)
+    # define the optimizer
     optimizer = optim.Adam(ddp_model.parameters(), lr=args.lr)
 
     if local_rank == 0:
@@ -344,15 +347,17 @@ def ddp_main(args):
 
             # loss = 0.5*fape + 2*cse copy from DeepMind AlphaFold2 loss function
             loss = 2 * loss_seq + 0.5 * fape_loss
+            # add the backward loss
+            loss.backward()
             optimizer.step()
-            loss = reduce_mean(loss, dist.get_world_size())
-            ppl =  reduce_mean(ppl, dist.get_world_size())
-            fape_loss =  reduce_mean(fape_loss, dist.get_world_size())
+            loss = reduce_mean(loss, dist.get_world_size(),device)
+            ppl =  reduce_mean(ppl, dist.get_world_size(),device)
+            fape_loss =  reduce_mean(fape_loss, dist.get_world_size(),device)
 
             # log the loss terms
             if local_rank == 0:
-                metric = {"TRAIN/ppl": ppl, 'TRAIN/fape': fape_loss,
-                          "TRAIN/ave_loss": loss, "TRAIN/epoch": epoch}
+                metric = {"TRAIN/ppl": ppl.item(), 'TRAIN/fape': fape_loss.item(),
+                          "TRAIN/ave_loss": loss.item(), "TRAIN/epoch": epoch}
                 wandb.log(metric)
                 
         # Validation epoch only for rank0, remember validation data loader is the normal sampler
