@@ -169,7 +169,6 @@ class esm_inpaint(nn.Module):
                 else:
                     parameter.requires_grad = False
 
-
     def inpaint_state_dict(self):
         """
         only the training parameters will be saved
@@ -179,5 +178,12 @@ class esm_inpaint(nn.Module):
             if parameter.requires_grad:
                 inpaint_parameters[name] = parameter
         return inpaint_parameters
-        # with open(path, 'wb') as file:
-        #     pickle.dump(inpaint_parameters, file)
+
+    def load_inpaint_dict(self,model):
+        """
+        load the inpaint parameter dictionary
+        """
+        if isinstance(model,str):
+            model = torch.load(model,map_location=self.seq_project.weight.device)
+            model = model['model_state_dict']
+        self.load_state_dict(model,strict=False)
