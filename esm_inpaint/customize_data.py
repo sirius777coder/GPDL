@@ -31,7 +31,7 @@ restypes = [
 restype_order = {restype: i for i, restype in enumerate(restypes)}
 
 class StructureDataset(Dataset):
-    def __init__(self,jsonl_file,max_length=500,low_fraction=0.2,high_fraction=0.6):
+    def __init__(self,jsonl_file,max_length=500,low_fraction=0.5,high_fraction=0.7):
         dataset = utils.load_jsonl(jsonl_file)
         self.data = []
         self.discard = {"bad_chars":0,"too_long":0}

@@ -27,7 +27,7 @@ def get_args():
     parser = ArgumentParser(description='ESM-Inpainting model')
     parser.add_argument('--temperature', type=float, default=1.0, help='Temperature to sample an amino acid')
     parser.add_argument('--noise', type=float, default=0.0, help='Add noise in training')
-    parser.add_argument('--lr',type=float,default=1e-2, help="learning rate of Adam optimizer")
+    parser.add_argument('--lr',type=float,default=1e-3, help="learning rate of Adam optimizer")
     parser.add_argument('--project_name', type=str,default="poc-esm-inpaint",help="project name in wandb")
     parser.add_argument('--data_jsonl', type=str,default="/root/data/chain_set.jsonl",help='Path for the jsonl data')
     parser.add_argument('--split_json', type=str,default="/root/data/splits.json", help='Path for the split json file')
@@ -35,7 +35,7 @@ def get_args():
     parser.add_argument('--output_folder',type=str,default="./",help="output folder for the model print information")
     parser.add_argument('--parameter_pattern',type=str,default="min",help="which part of parameters should be frozen")
     parser.add_argument('--parameters',type=str,default="/root/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt", help="parameters path")
-    parser.add_argument('--epochs',type=int,default=3,help="epochs to train the model")
+    parser.add_argument('--epochs',type=int,default=1,help="epochs to train the model")
     parser.add_argument('--batch_size',type=int,default=6,help="batch size of protein sequences")
     parser.add_argument('--chunk_size',type=int,default=64,help="chunk size of the model")
     parser.add_argument('--max_length',type=int,default=300,help="max length of the dataset")
@@ -359,94 +359,100 @@ def ddp_main(args):
                 metric = {"TRAIN/ppl": ppl.item(), 'TRAIN/fape': fape_loss.item(),
                           "TRAIN/ave_loss": loss.item(), "TRAIN/epoch": epoch}
                 wandb.log(metric)
+    param_state_dict = ddp_model.module.inpaint_state_dict()
+    torch.save({
+            'epoch': epoch,
+            'model_state_dict': param_state_dict,
+            'optimizer_state_dict': optimizer.state_dict()
+        }, os.path.join(args.save_folder, f"test.pt"))
                 
-        # Validation epoch only for rank0, remember validation data loader is the normal sampler
-        if local_rank == 0:
-            ddp_model.eval()
-            with torch.no_grad():
-                val_loss = 0
-                val_fape = 0
-                val_seq = 0
-                for _, batch in enumerate(loader_validation):
-                    batch = utils.move_batch(batch, device)
-                    output = ddp_model(coord=batch['mask_coord'], mask=(
-                        batch['padding_mask']).to(torch.float32), S=batch['mask_seq'])
-                    # seq loss (nll)
-                    log_pred = output['log_softmax_aa']
-                    padding_mask = batch['padding_mask']
-                    loss_seq_token, loss_seq = utils.loss_nll(
-                        batch['seq'], log_pred, padding_mask)
+    #     # Validation epoch only for rank0, remember validation data loader is the normal sampler
+    #     if local_rank == 0:
+    #         ddp_model.eval()
+    #         with torch.no_grad():
+    #             val_loss = 0
+    #             val_fape = 0
+    #             val_seq = 0
+    #             for _, batch in enumerate(loader_validation):
+    #                 batch = utils.move_batch(batch, device)
+    #                 output = ddp_model(coord=batch['mask_coord'], mask=(
+    #                     batch['padding_mask']).to(torch.float32), S=batch['mask_seq'])
+    #                 # seq loss (nll)
+    #                 log_pred = output['log_softmax_aa']
+    #                 padding_mask = batch['padding_mask']
+    #                 loss_seq_token, loss_seq = utils.loss_nll(
+    #                     batch['seq'], log_pred, padding_mask)
 
-                    # structure loss (fape)
-                    B, L = output['positions'].shape[:2]
-                    pred_position = output['positions'].reshape(B, -1, 3)
-                    target_position = batch['coord'][:,
-                                                     :, :3, :].reshape(B, -1, 3)
-                    position_mask = torch.ones_like(target_position[..., 0])
-                    fape_loss = torch.mean(utils.compute_fape(
-                        output['pred_frames'], output['target_frames'], batch['padding_mask'], pred_position, target_position, position_mask, 10.0))
-                    # loss = 0.5*fape + 0.2*cse copy from DeepMind AlphaFold2 loss function
-                    loss = 2 * loss_seq + 0.5 * fape_loss
-                    val_loss += loss.item()
-                    val_seq += loss_seq.item()
-                    val_fape += fape_loss.item()
-                val_loss /= len(loader_validation)
-                val_fape /= len(loader_validation)
-                val_seq /= len(loader_validation)
+    #                 # structure loss (fape)
+    #                 B, L = output['positions'].shape[:2]
+    #                 pred_position = output['positions'].reshape(B, -1, 3)
+    #                 target_position = batch['coord'][:,
+    #                                                  :, :3, :].reshape(B, -1, 3)
+    #                 position_mask = torch.ones_like(target_position[..., 0])
+    #                 fape_loss = torch.mean(utils.compute_fape(
+    #                     output['pred_frames'], output['target_frames'], batch['padding_mask'], pred_position, target_position, position_mask, 10.0))
+    #                 # loss = 0.5*fape + 0.2*cse copy from DeepMind AlphaFold2 loss function
+    #                 loss = 2 * loss_seq + 0.5 * fape_loss
+    #                 val_loss += loss.item()
+    #                 val_seq += loss_seq.item()
+    #                 val_fape += fape_loss.item()
+    #             val_loss /= len(loader_validation)
+    #             val_fape /= len(loader_validation)
+    #             val_seq /= len(loader_validation)
 
-                metric = {'VAL/ppl': np.exp(val_seq.cpu().data.numpy()),
-                          'VAL/fape': val_fape, "VAL/loss": val_loss}
-                wandb.log(metric)
-                if best_val_loss > val_loss:
-                    best_val_loss = val_loss
-                    best_model = model
-                    best_model_idx = epoch
-                    param_state_dict = model.module.inpaint_state_dict()
-                    torch.save({
-                        'epoch': epoch,
-                        'model_state_dict': param_state_dict,
-                        'optimizer_state_dict': optimizer.state_dict()
-                    }, os.path.join(args.save_folder, f"epoch{epoch}.pt"))
-                with open("log.txt", "w") as f:
-                    f.write(
-                        f"{epoch},{val_loss:.4f},{val_fape:.4f},{np.exp(val_seq.cpu().data.numpy()):.4f}\n")
-        dist.barrier() # 这一句作用是：所有进程(gpu)上的代码都执行到这，才会执行该句下面的代码   
-    if local_rank == 0:
-        # Test epoch
-        ddp_model.eval()
-        with torch.no_grad():
-            test_loss = 0
-            test_fape = 0
-            test_seq = 0
-            for _, batch in enumerate(loader_test):
-                batch = utils.move_batch(batch, device)
-                output = model(coord=batch['mask_coord'], mask=(
-                    batch['padding_mask']).to(torch.float32), S=batch['mask_seq'])
-                # seq loss (nll)
-                log_pred = output['log_softmax_aa']
-                padding_mask = batch['padding_mask']
-                loss_seq_token, loss_seq = utils.loss_nll(
-                    batch['seq'], log_pred, padding_mask)
+    #             metric = {'VAL/ppl': np.exp(val_seq.cpu().data.numpy()),
+    #                       'VAL/fape': val_fape, "VAL/loss": val_loss}
+    #             wandb.log(metric)
+    #             if best_val_loss > val_loss:
+    #                 best_val_loss = val_loss
+    #                 best_model = model
+    #                 best_model_idx = epoch
+    #                 param_state_dict = model.module.inpaint_state_dict()
+    #                 torch.save({
+    #                     'epoch': epoch,
+    #                     'model_state_dict': param_state_dict,
+    #                     'optimizer_state_dict': optimizer.state_dict()
+    #                 }, os.path.join(args.save_folder, f"epoch{epoch}.pt"))
+    #             with open("log.txt", "w") as f:
+    #                 f.write(
+    #                     f"{epoch},{val_loss:.4f},{val_fape:.4f},{np.exp(val_seq.cpu().data.numpy()):.4f}\n")
+    #     dist.barrier() # 这一句作用是：所有进程(gpu)上的代码都执行到这，才会执行该句下面的代码   
+    # if local_rank == 0:
+    #     # Test epoch
+    #     ddp_model.eval()
+    #     with torch.no_grad():
+    #         test_loss = 0
+    #         test_fape = 0
+    #         test_seq = 0
+    #         for _, batch in enumerate(loader_test):
+    #             batch = utils.move_batch(batch, device)
+    #             output = model(coord=batch['mask_coord'], mask=(
+    #                 batch['padding_mask']).to(torch.float32), S=batch['mask_seq'])
+    #             # seq loss (nll)
+    #             log_pred = output['log_softmax_aa']
+    #             padding_mask = batch['padding_mask']
+    #             loss_seq_token, loss_seq = utils.loss_nll(
+    #                 batch['seq'], log_pred, padding_mask)
 
-                # structure loss (fape)
-                B, L = output['positions'].shape[:2]
-                pred_position = output['positions'].reshape(B, -1, 3)
-                target_position = batch['coord'][:, :, :3, :].reshape(B, -1, 3)
-                position_mask = torch.ones_like(target_position[..., 0])
-                fape_loss = torch.mean(utils.compute_fape(
-                    output['pred_frames'], output['target_frames'], batch['padding_mask'], pred_position, target_position, position_mask, 10.0))
-                # loss = 2*fape + 0.2*cse copy from DeepMind AlphaFold2 loss function
-                loss = 2 * loss_seq + 0.5 * fape_loss
-                test_loss += loss.item()
-                test_seq += loss_seq.item()
-                test_fape += fape_loss.item()
-            test_loss /= len(loader_test)
-            test_seq /= len(loader_test)
-            test_fape /= len(loader_test)
+    #             # structure loss (fape)
+    #             B, L = output['positions'].shape[:2]
+    #             pred_position = output['positions'].reshape(B, -1, 3)
+    #             target_position = batch['coord'][:, :, :3, :].reshape(B, -1, 3)
+    #             position_mask = torch.ones_like(target_position[..., 0])
+    #             fape_loss = torch.mean(utils.compute_fape(
+    #                 output['pred_frames'], output['target_frames'], batch['padding_mask'], pred_position, target_position, position_mask, 10.0))
+    #             # loss = 2*fape + 0.2*cse copy from DeepMind AlphaFold2 loss function
+    #             loss = 2 * loss_seq + 0.5 * fape_loss
+    #             test_loss += loss.item()
+    #             test_seq += loss_seq.item()
+    #             test_fape += fape_loss.item()
+    #         test_loss /= len(loader_test)
+    #         test_seq /= len(loader_test)
+    #         test_fape /= len(loader_test)
 
-        print(
-            f"Perplexity\tTest{np.exp(test_seq.cpu().data.numpy()) :.4f}\nFape\t{test_fape :.4f}\nLoss\t{test_loss :.4f}")
-    dist.barrier() 
+    #     print(
+    #         f"Perplexity\tTest{np.exp(test_seq.cpu().data.numpy()) :.4f}\nFape\t{test_fape :.4f}\nLoss\t{test_loss :.4f}")
+    # dist.barrier() 
 
 
 
