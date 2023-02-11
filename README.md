@@ -4,6 +4,7 @@
 
 2. Only structure module and some linear project layers(like distance linear layer and sequence output embedding) were trained.
 
+[model](./img/inpaint.png)
 -----
 Author : Bo Zhang  
 E-mail : zhangbo777@sjtu.edu.cn
