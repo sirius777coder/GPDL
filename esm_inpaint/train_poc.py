@@ -2,7 +2,7 @@
 # date   : 12.28
 # Author : Bo Zhang
 # Content: 
-#  - 4 V100 GPU for poc :5 epochs, batch_size = 8 
+#  - 4 V100 GPU for poc :1 epochs, batch_size = 8 
 #  - Training:16631, Validation:1516, Test:1864
 # Visualization : wanb
 
@@ -28,9 +28,9 @@ def get_args():
     parser.add_argument('--temperature', type=float, default=1.0, help='Temperature to sample an amino acid')
     parser.add_argument('--noise', type=float, default=0.0, help='Add noise in training')
     parser.add_argument('--lr',type=float,default=1e-3, help="learning rate of Adam optimizer")
-    parser.add_argument('--project_name', type=str,default="poc-esm-inpaint",help="project name in wandb")
-    parser.add_argument('--data_jsonl', type=str,default="/root/data/chain_set.jsonl",help='Path for the jsonl data')
-    parser.add_argument('--split_json', type=str,default="/root/data/splits.json", help='Path for the split json file')
+    parser.add_argument('--project_name', type=str,default="esm-inpaint",help="project name in wandb")
+    parser.add_argument('--data_jsonl', type=str,default="/data/users/zb/data/chain_set.jsonl",help='Path for the jsonl data')
+    parser.add_argument('--split_json', type=str,default="/data/users/zb/data/splits.json", help='Path for the split json file')
     parser.add_argument('--save_folder',type=str,default="./",help="output folder for the model parameters")
     parser.add_argument('--output_folder',type=str,default="./",help="output folder for the model print information")
     parser.add_argument('--parameter_pattern',type=str,default="min",help="which part of parameters should be frozen")
@@ -333,10 +333,13 @@ def ddp_main(args):
             # seq loss (nll)
             log_pred = output['log_softmax_aa']
             padding_mask = batch['padding_mask']
+
+            pre_seq = log_pred.argmax(dim=-1)
+            recovery = torch.sum( (pre_seq == batch['seq']) * padding_mask ) / torch.sum(padding_mask)
+
             loss_seq_token, loss_seq = utils.loss_nll(
                 batch['seq'], log_pred, padding_mask)
             ppl = np.exp(loss_seq.cpu().data.numpy())
-
             # structure loss (fape)
             B, L = output['positions'].shape[:2]
             pred_position = output['positions'].reshape(B, -1, 3)
@@ -344,7 +347,7 @@ def ddp_main(args):
             position_mask = torch.ones_like(target_position[..., 0])
             fape_loss = torch.mean(utils.compute_fape(
                 output['pred_frames'], output['target_frames'], batch['padding_mask'], pred_position, target_position, position_mask, 10.0))
-
+            lddt = utils.lddt_ca(pred_position,target_position,padding_mask.unsqueeze(-1))
             # loss = 0.5*fape + 2*cse copy from DeepMind AlphaFold2 loss function
             loss = 2 * loss_seq + 0.5 * fape_loss
             # add the backward loss
@@ -356,15 +359,15 @@ def ddp_main(args):
 
             # log the loss terms
             if local_rank == 0:
-                metric = {"TRAIN/ppl": ppl.item(), 'TRAIN/fape': fape_loss.item(),
-                          "TRAIN/ave_loss": loss.item(), "TRAIN/epoch": epoch}
+                metric = {"TRAIN/ppl": ppl.item(), "TRAIN/fape": fape_loss.item(),
+                          "TRAIN/ave_loss": loss.item(), "TRAIN/recovery": recovery.item(),"TRAIN/epoch": epoch}
                 wandb.log(metric)
     param_state_dict = ddp_model.module.inpaint_state_dict()
     torch.save({
             'epoch': epoch,
             'model_state_dict': param_state_dict,
             'optimizer_state_dict': optimizer.state_dict()
-        }, os.path.join(args.save_folder, f"test.pt"))
+        }, os.path.join(args.save_folder, f"weight_02.pt"))
                 
     #     # Validation epoch only for rank0, remember validation data loader is the normal sampler
     #     if local_rank == 0:

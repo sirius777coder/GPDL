@@ -100,12 +100,12 @@ class esm_inpaint(nn.Module):
         # convert the coord to global frames
         bb_frame_atom = coord[:,:,0:3,:]
         bb_rotation,bb_translation = utils.get_bb_frames(bb_frame_atom)
-        mask_frame = mask.reshape(*mask.shape,1,1)
-        mask_frame = mask_frame.expand(*mask_frame.shape[:-2],4,4)
+        # mask_frame = mask.reshape(*mask.shape,1,1)
+        # mask_frame = mask_frame.expand(*mask_frame.shape[:-2],4,4)
         bb_frame = torch.zeros((*bb_rotation.shape[:-2],4,4),device=coord.device)
         bb_frame[...,:3,:3] = bb_rotation
         bb_frame[...,:3,3] = bb_translation # [B, L, 4, 4]
-        bb_frame = bb_frame * mask_frame
+        # bb_frame = bb_frame * mask_frame
         bb_frame = Rigid.from_tensor_4x4(bb_frame)
 
         # running the esmfold 

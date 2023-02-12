@@ -22,6 +22,14 @@ import torch.nn.functional as F
 import torch.utils.data as data
 from typing import Sequence, Tuple, List, Optional,Iterable
 from openfold.utils.rigid_utils import Rotation, Rigid
+from openfold.np import residue_constants
+from openfold.utils.tensor_utils import (
+    tree_map,
+    tensor_tree_map,
+    masked_mean,
+    permute_final_dims,
+    batched_gather,
+)
 from esm.data import BatchConverter
 
 
@@ -214,12 +222,10 @@ def transform(v, R, t=None):
         t: translation vector, (length x batch_size x 3)
     Returns:
         Rotated version of v by rotation matrix R.
-    Explain:
-        As R is a rotation matrix, torch.sum(v * R, dim = -2) is a  transpose matrix to (R @ v).squeeze(-1)
     """
     R = R.unsqueeze(-3)  # [B, L, 3, 3]        -> [B, L, 1, 3, 3]
     v = v.unsqueeze(-1)  # [B, L, channels, 3] -> [B, L, channels, 3 ,1 ]
-    v_rotation = torch.sum(v * R, dim=-2)
+    v_rotation = (R @ v).squeeze(-1)
     if t is not None:
         v_translation = v_rotation + t
     return v_translation
@@ -240,11 +246,33 @@ def get_bb_frames(coords):
     e1 = normalize(v1, dim=-1)
     u2 = v2 - e1 * torch.sum(e1 * v2, dim=-1, keepdim=True)
     e2 = normalize(u2, dim=-1)
-    e3 = torch.cross(e1, e2, dim=-1)
-    R = torch.stack([e1, e2, e3], dim=-2)
+    e3 = torch.cross(e1, e2, dim = -1)
+    R = torch.stack([e1, e2, e3], dim=-1) # note dim = -1 !!!
     t = coords[:, :, 1]  # translation is just the CA atom coordinate
     return R, t
 
+
+
+def rot_to_quat(
+    rot: torch.Tensor,
+):
+    if(rot.shape[-2:] != (3, 3)):
+        raise ValueError("Input rotation is incorrectly shaped")
+
+    rot = [[rot[..., i, j] for j in range(3)] for i in range(3)]
+    [[xx, xy, xz], [yx, yy, yz], [zx, zy, zz]] = rot 
+
+    k = [
+        [ xx + yy + zz,      zy - yz,      xz - zx,      yx - xy,],
+        [      zy - yz, xx - yy - zz,      xy + yx,      xz + zx,],
+        [      xz - zx,      xy + yx, yy - xx - zz,      yz + zy,],
+        [      yx - xy,      xz + zx,      yz + zy, zz - xx - yy,]
+    ]
+
+    k = (1./3.) * torch.stack([torch.stack(t, dim=-1) for t in k], dim=-2)
+
+    _, vectors = torch.linalg.eigh(k)
+    return vectors[..., -1]
 
 def norm(tensor, dim, eps=1e-8, keepdim=False):
     """
@@ -269,6 +297,7 @@ def nan_to_num(ts, val=0.0):
     """
     val = torch.tensor(val, dtype=ts.dtype, device=ts.device)
     return torch.where(~torch.isfinite(ts), val, ts)
+
 
 
 
@@ -423,6 +452,83 @@ def backbone_loss(
     fape_loss = torch.mean(fape_loss)
 
     return 
+
+def lddt(
+    all_atom_pred_pos: torch.Tensor,
+    all_atom_positions: torch.Tensor,
+    all_atom_mask: torch.Tensor,
+    cutoff: float = 15.0,
+    eps: float = 1e-10,
+    per_residue: bool = True,
+) -> torch.Tensor:
+    n = all_atom_mask.shape[-2]
+    dmat_true = torch.sqrt(
+        eps
+        + torch.sum(
+            (
+                all_atom_positions[..., None, :]
+                - all_atom_positions[..., None, :, :]
+            )
+            ** 2,
+            dim=-1,
+        )
+    )
+
+    dmat_pred = torch.sqrt(
+        eps
+        + torch.sum(
+            (
+                all_atom_pred_pos[..., None, :]
+                - all_atom_pred_pos[..., None, :, :]
+            )
+            ** 2,
+            dim=-1,
+        )
+    )
+    dists_to_score = (
+        (dmat_true < cutoff)
+        * all_atom_mask
+        * permute_final_dims(all_atom_mask, (1, 0))
+        * (1.0 - torch.eye(n, device=all_atom_mask.device))
+    )
+
+    dist_l1 = torch.abs(dmat_true - dmat_pred)
+
+    score = (
+        (dist_l1 < 0.5).type(dist_l1.dtype)
+        + (dist_l1 < 1.0).type(dist_l1.dtype)
+        + (dist_l1 < 2.0).type(dist_l1.dtype)
+        + (dist_l1 < 4.0).type(dist_l1.dtype)
+    )
+    score = score * 0.25
+
+    dims = (-1,) if per_residue else (-2, -1)
+    norm = 1.0 / (eps + torch.sum(dists_to_score, dim=dims))
+    score = norm * (eps + torch.sum(dists_to_score * score, dim=dims))
+
+    return score
+
+def lddt_ca(
+    all_atom_pred_pos: torch.Tensor,
+    all_atom_positions: torch.Tensor,
+    all_atom_mask: torch.Tensor,
+    cutoff: float = 15.0,
+    eps: float = 1e-10,
+    per_residue: bool = True,
+) -> torch.Tensor:
+    ca_pos = residue_constants.atom_order["CA"]
+    all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
+    all_atom_positions = all_atom_positions[..., ca_pos, :]
+    # all_atom_mask = all_atom_mask[..., ca_pos : (ca_pos + 1)]  # keep dim
+
+    return lddt(
+        all_atom_pred_pos,
+        all_atom_positions,
+        all_atom_mask,
+        cutoff=cutoff,
+        eps=eps,
+        per_residue=per_residue,
+    )
 
 class CoordBatchConverter(BatchConverter):
     def __init__(self, alphabet, truncation_seq_length: int = None):
