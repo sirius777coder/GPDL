@@ -117,10 +117,11 @@ class ESMFold(nn.Module):
         new_esmaa[pattern == 1] = self.esm_dict.mask_idx
         return new_esmaa
 
+    #        dis_embed: torch.Tensor,
+    # bb_frame
     def forward(
         self,
-        dis_embed: torch.Tensor,
-        bb_frame: torch.Tensor,
+        dis_embed : torch.Tensor,
         aa: torch.Tensor,
         mask: T.Optional[torch.Tensor] = None,
         residx: T.Optional[torch.Tensor] = None,
@@ -131,6 +132,7 @@ class ESMFold(nn.Module):
         run inference from a sequence.
 
         Args:
+            bb_frame (Rigid class) by zb
             aa (torch.Tensor): Tensor containing indices corresponding to amino acids. Indices match
                 openfold.np.residue_constants.restype_order_with_x.
             mask (torch.Tensor): Binary tensor with 1 meaning position is unmasked and 0 meaning position is masked.
@@ -175,8 +177,10 @@ class ESMFold(nn.Module):
 
         s_s_0 += self.embedding(aa)
 
+        # structure: dict = self.trunk(
+        #     dis_embed, bb_frame, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
         structure: dict = self.trunk(
-            dis_embed, bb_frame, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
+            dis_embed, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
         # Documenting what we expect:
         structure = {
             k: v
@@ -194,22 +198,22 @@ class ESMFold(nn.Module):
             ]
         }
 
-        # disto_logits = self.distogram_head(structure["s_z"])
-        # disto_logits = (disto_logits + disto_logits.transpose(1, 2)) / 2
-        # structure["distogram_logits"] = disto_logits
+        disto_logits = self.distogram_head(structure["s_z"])
+        disto_logits = (disto_logits + disto_logits.transpose(1, 2)) / 2
+        structure["distogram_logits"] = disto_logits
 
         lm_logits = self.lm_head(structure["s_s"])
         structure["lm_logits"] = lm_logits
 
         structure["aatype"] = aa
-        # make_atom14_masks(structure)
+        make_atom14_masks(structure)
 
-        # for k in [
-        #     "atom14_atom_exists",
-        #     "atom37_atom_exists",
-        # ]:
-        #     structure[k] *= mask.unsqueeze(-1)
-        # structure["residue_index"] = residx
+        for k in [
+            "atom14_atom_exists",
+            "atom37_atom_exists",
+        ]:
+            structure[k] *= mask.unsqueeze(-1)
+        structure["residue_index"] = residx
 
         lddt_head = self.lddt_head(structure["states"]).reshape(
             structure["states"].shape[0], B, L, -1, self.lddt_bins
@@ -280,7 +284,7 @@ class ESMFold(nn.Module):
         aatype, mask, residx, linker_mask = map(
             lambda x: x.to(self.device), (aatype, mask, residx, linker_mask)
         )
-
+        print(aatype)
         output = self.forward(
             aatype,
             mask=mask,

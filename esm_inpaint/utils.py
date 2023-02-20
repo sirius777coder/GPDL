@@ -57,6 +57,63 @@ restypes = [
     "V",
 ]
 restype_order = {restype: i for i, restype in enumerate(restypes)}
+restype_num = len(restypes)  # := 20.
+alphabet = {
+    'ALA': 'A', 'VAL': 'V', 'PHE': 'F', 'PRO': 'P', 'MET': 'M',
+    'ILE': 'I', 'LEU': 'L', 'ASP': 'D', 'GLU': 'E', 'LYS': 'K',
+    'ARG': 'R', 'SER': 'S', 'THR': 'T', 'TYR': 'Y', 'HIS': 'H',
+    'CYS': 'C', 'ASN': 'N', 'GLN': 'Q', 'TRP': 'W', 'GLY': 'G',
+}
+alphabet_map = {v:k for k,v in alphabet.items()}
+
+
+def output_to_pdb(positions:torch.Tensor, aatype:torch.Tensor, plddt:torch.Tensor = None, file_path = "result.pdb"):
+    """
+    Assume batch = 1 (B=1)
+    positions [B, L, 3, 3]
+    aatype [B, L]
+    plddt [B, L, 3]
+    """
+    if plddt is None:
+        plddt = torch.zeros((1,positions.shape[1],3))
+    positions = torch.detach(positions)
+    positions = positions.to("cpu").numpy()
+    
+    aatype = torch.detach(aatype)
+    aatype = aatype.to("cpu").numpy()
+
+    plddt = torch.detach(plddt)
+    plddt = plddt.to("cpu").numpy()
+
+    B,L = positions.shape[:2]
+    atom_list = []
+    for i in range(L):
+        if aatype[0][i] < len(restypes):
+            res_type_1c = restypes[aatype[0][i]]
+            res_type_3c = alphabet_map[res_type_1c]
+        else:
+            res_type_3c = "UNK"
+        atom_N = positions[0][i][0]
+        plddt_N = plddt[0][i][0]
+
+        atom_CA = positions[0][i][1]
+        plddt_CA = plddt[0][i][1]
+
+        atom_C = positions[0][i][2]
+        plddt_C = plddt[0][i][2]
+
+        atom1 = biotite.structure.Atom(atom_N, chain_id="A", res_id=i+1, res_name=res_type_3c,
+                        atom_name="N", element="N", b_factor=plddt_N)
+        atom2 = biotite.structure.Atom(atom_CA, chain_id="A", res_id=i+1, res_name=res_type_3c,
+                        atom_name="CA", element="C", b_factor=plddt_CA)
+        atom3 = biotite.structure.Atom(atom_C, chain_id="A", res_id=i+1, res_name=res_type_3c,
+                        atom_name="C", element="C", b_factor=plddt_C)
+        atom_list += [atom1,atom2,atom3]
+    array = biotite.structure.array(atom_list)
+    
+    pdb_file = pdb.PDBFile()
+    pdb_file.set_structure(array)
+    pdb_file.write(file_path)
 
 
 def trainable_parameters(parameters):
@@ -115,12 +172,13 @@ def loss_nll(S, log_probs, mask):
     loss_av = torch.sum(loss * mask) / torch.sum(mask)
     return loss, loss_av
 
-def loss_smoothed(S, log_probs, mask, weight=0.1):
+def loss_smoothed(S, log_probs, mask, weight=0.1, vocab=22):
     """ Negative log probabilities """
     S_onehot = torch.nn.functional.one_hot(S).float()
 
     # Label smoothing
-    S_onehot = S_onehot + weight / float(S_onehot.size(-1))
+    # S_onehot = S_onehot + weight / float(S_onehot.size(-1))
+    S_onehot = S_onehot + weight / vocab
     S_onehot = S_onehot / S_onehot.sum(-1, keepdim=True)
 
     loss = -(S_onehot * log_probs).sum(-1)
@@ -164,16 +222,19 @@ def load_structure(fpath, chain=None):
     return structure
 
 
-def extract_coords_from_structure(structure: biotite.structure.AtomArray):
+def extract_coords_from_structure(structure: biotite.structure.AtomArray,pattern="min"):
     """
     Args:
         structure: An instance of biotite AtomArray
     Returns:
         Tuple (coords, seq)
-            - coords is an L x 3 x 3 array for N, CA, C coordinates
+            - coords is an L x 3 x 3 array for N, CA, C coordinates or O atom for pattern = "max"
             - seq is the extracted sequence
     """
-    coords = get_atom_coords_residuewise(["N", "CA", "C"], structure)
+    if pattern == "min":
+        coords = get_atom_coords_residuewise(["N", "CA", "C"], structure)
+    elif pattern == "max":
+        coords = get_atom_coords_residuewise(["N", "CA", "C", "O"], structure)
     residue_identities = get_residues(structure)[1]
     seq = ''.join([ProteinSequence.convert_letter_3to1(r)
                   for r in residue_identities])
@@ -451,7 +512,7 @@ def backbone_loss(
     # Average over the batch dimension
     fape_loss = torch.mean(fape_loss)
 
-    return 
+    return fape_loss
 
 def lddt(
     all_atom_pred_pos: torch.Tensor,
@@ -472,7 +533,7 @@ def lddt(
             ** 2,
             dim=-1,
         )
-    )
+    ) # [B, L, L] 
 
     dmat_pred = torch.sqrt(
         eps

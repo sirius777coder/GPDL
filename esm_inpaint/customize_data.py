@@ -4,34 +4,14 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import numpy as np
 import json,copy,time
+# import esm_inpaint.utils as utils
 import utils
 
-restypes = [
-    "A",
-    "R",
-    "N",
-    "D",
-    "C",
-    "Q",
-    "E",
-    "G",
-    "H",
-    "I",
-    "L",
-    "K",
-    "M",
-    "F",
-    "P",
-    "S",
-    "T",
-    "W",
-    "Y",
-    "V",
-]
+restypes =["A","R","N","D","C","Q","E","G","H","I","L","K","M","F","P","S","T","W","Y","V",]
 restype_order = {restype: i for i, restype in enumerate(restypes)}
 
 class StructureDataset(Dataset):
-    def __init__(self,jsonl_file,max_length=500,low_fraction=0.5,high_fraction=0.7):
+    def __init__(self,jsonl_file,max_length=500,low_fraction=0.3,high_fraction=0.6):
         dataset = utils.load_jsonl(jsonl_file)
         self.data = []
         self.discard = {"bad_chars":0,"too_long":0}
@@ -53,28 +33,25 @@ class StructureDataset(Dataset):
             seq = torch.tensor([restype_order[i] for i in seq],dtype=torch.long)
             coord = torch.from_numpy(np.stack(list(entry['coords'].values()),axis=-2))
             coord = coord.to(torch.float32)
-            coord = utils.nan_to_num(coord) # remove the nan value
+            coord = utils.nan_to_num(coord) 
+
+            # add mask label to seq and structure seperately
             bert_mask_fraction = torch.tensor([np.random.uniform(low=low_fraction, high=high_fraction),],dtype=torch.float32)
-            bert_mask = []
-            for _ in range(len(seq)):
-                if np.random.random() < bert_mask_fraction:
-                    bert_mask.append(False)
-                else:
-                    bert_mask.append(True)
-            bert_mask = torch.tensor(bert_mask,dtype=torch.bool) # 0.0, mask; 1 unmask
-            mask_coord = copy.deepcopy(coord)
-            mask_coord[~bert_mask] = 0.0 # zero the mask backbone
+            bert_mask_seq = torch.tensor(np.random.random(len(seq)) > bert_mask_fraction.numpy(), dtype=torch.bool)  # For seq. 0.0, mask; 1 unmask
+            bert_mask_structure = torch.tensor(np.random.random(len(seq)) > bert_mask_fraction.numpy(), dtype=torch.bool) # For seq. 0.0, mask; 1 unmask
+
+            # mask seq inplace (mask structure in inpainting model)
             mask_seq = copy.deepcopy(seq)
-            mask_seq[~bert_mask] = 20
+            mask_seq[~bert_mask_seq] = 0 # alanine aa to mask
 
             self.data.append({
                 "name":name,
                 "coord":coord,
                 "seq":seq,
-                "mask_coord":mask_coord,
                 "mask_seq":mask_seq,
                 "bert_mask_fraction":bert_mask_fraction,
-                "bert_mask":bert_mask
+                "bert_mask_seq":bert_mask_seq,
+                "bert_mask_structure":bert_mask_structure,
             })
         print(f"UNK token:{self.discard['bad_chars']},too long:{self.discard['too_long']}")
 
@@ -99,10 +76,11 @@ def batch_collate_function(batch):
     """
     coord_batch = utils.CoordBatchConverter.collate_dense_tensors([i['coord'] for i in batch],0.0)
     seq_batch = utils.CoordBatchConverter.collate_dense_tensors([i['seq'] for i in batch],-1)
-    mask_coord_batch = utils.CoordBatchConverter.collate_dense_tensors([i['mask_coord'] for i in batch],0.0)
+    # mask_coord_batch = utils.CoordBatchConverter.collate_dense_tensors([i['mask_coord'] for i in batch],0.0)
     mask_seq_batch = utils.CoordBatchConverter.collate_dense_tensors([i['mask_seq'] for i in batch],-1)
     bert_mask_fraction_batch = utils.CoordBatchConverter.collate_dense_tensors([i['bert_mask_fraction'] for i in batch],0.0)
-    bert_mask_batch = utils.CoordBatchConverter.collate_dense_tensors([i['bert_mask'] for i in batch],0.0)
+    bert_mask_seq_batch = utils.CoordBatchConverter.collate_dense_tensors([i['bert_mask_seq'] for i in batch],0.0)
+    bert_mask_structure_batch = utils.CoordBatchConverter.collate_dense_tensors([i['bert_mask_structure'] for i in batch],0.0)
     padding_mask_batch = seq_batch!=-1 # True not mask, False represents mask
     seq_batch[~padding_mask_batch] = 0 # padding to 0
     mask_seq_batch[~padding_mask_batch] = 0 # padding to 0
@@ -110,11 +88,11 @@ def batch_collate_function(batch):
     output = {
         "coord":coord_batch,
         "seq":seq_batch,
-        "mask_coord":mask_coord_batch,
         "mask_seq":mask_seq_batch,
         "bert_mask_fraction":bert_mask_fraction_batch,
-        "bert_mask":bert_mask_batch,
-        "padding_mask":padding_mask_batch
+        "bert_mask_seq":bert_mask_seq_batch,
+        "bert_mask_structure":bert_mask_structure_batch,
+        "padding_mask":padding_mask_batch,
     }
     return output
     

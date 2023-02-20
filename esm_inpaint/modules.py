@@ -65,7 +65,7 @@ class ProteinFeatures(nn.Module):
         return E * mask_2d
 
 class esm_inpaint(nn.Module):
-    def __init__(self,cfg,chunk_size=128,augment_eps=0.02,pattern="min"):
+    def __init__(self,cfg,chunk_size=128,augment_eps=0.0,pattern="max"):
         """
         cfg is the defaulted input information to the esmfold
         """
@@ -84,52 +84,82 @@ class esm_inpaint(nn.Module):
 
         self._froezen(patern=pattern)
 
-    def forward(self,coord,mask,S):
+    # def forward(self,coord,mask,S):
+    def forward(self,coord,S,mask=None,bert_mask_structure=None):
         """
         coord : [B, L, 4, 3]_float32
         mask  : [B, L]_float32, 0 means padding mask and no loss, 1 means no padding mask and compute the loss
-        S     : [B, L]_long
+        S : [B, L]_long
         """
+        if mask is None:
+            mask = torch.ones_like(S).to(coord.device)
+        # with torch.no_grad():
+        #     output = self.esmfold(S,mask)
+        # output_xyz = output['positions'][-1,...,:3,:]
+        # output_plddt = output['plddt'][...,:3]
+
+        # utils.output_to_pdb(output_xyz,S,plddt=output_plddt,file_path=file_path)
+
+        # with open("result.pdb", "w") as f:
+        #     f.write(output)
+
+        # import biotite.structure.io as bsio
+        # struct = bsio.load_structure("result.pdb", extra_fields=["b_factor"])
+        # print(struct.b_factor.mean())  # this will be the pLDDT
+
+
         # Data augmentation by gaussian noise
-        if self.training and self.augment_eps > 0:
-            coord = coord + self.augment_eps * torch.randn_like(coord)
+        # if self.training and self.augment_eps > 0:
+        #     coord = coord + self.augment_eps * torch.randn_like(coord)
         
         # add the distance embedding features
-        dis_embed = self.ProteinFeatures(coord,mask)
+        if bert_mask_structure is not None:
+            dis_embed = self.ProteinFeatures(coord,mask * bert_mask_structure)
+        else:
+            dis_embed = self.ProteinFeatures(coord,mask)
 
         # convert the coord to global frames
         bb_frame_atom = coord[:,:,0:3,:]
+        # # # rotation [B, L, 3, 3]
+        # # # translation [B, L, 3]
+        # # # bert_mask_structure [B, L] 0 unmask, 1 mask
         bb_rotation,bb_translation = utils.get_bb_frames(bb_frame_atom)
-        # mask_frame = mask.reshape(*mask.shape,1,1)
-        # mask_frame = mask_frame.expand(*mask_frame.shape[:-2],4,4)
+        # # bb_rotation[~bert_mask_structure] = torch.eye(3,device=coord.device) # black hole initialization
+        # # bb_translation[~bert_mask_structure] = 0.0
+
+        # # mask_frame = mask.reshape(*mask.shape,1,1)
+        # # mask_frame = mask_frame.expand(*mask_frame.shape[:-2],4,4)
         bb_frame = torch.zeros((*bb_rotation.shape[:-2],4,4),device=coord.device)
         bb_frame[...,:3,:3] = bb_rotation
         bb_frame[...,:3,3] = bb_translation # [B, L, 4, 4]
-        # bb_frame = bb_frame * mask_frame
         bb_frame = Rigid.from_tensor_4x4(bb_frame)
 
         # running the esmfold 
-        structure = self.esmfold(dis_embed,bb_frame,S,mask)
+        # structure = self.esmfold(dis_embed,bb_frame,S,mask)
+        # structure = self.esmfold(bb_frame,S,mask)
+        structure = self.esmfold(dis_embed,S,mask)
 
         # refine the output
         # seq = self.seq_project1(self.norm1(structure['s_s']))
         # seq = self.seq_project2(self.norm2(seq))
         seq = self.seq_project(self.norm1(structure['s_s']))
         output_seq = F.log_softmax(seq,dim=-1)
+        sample_seq = torch.multinomial(F.softmax(seq[0],dim=-1),num_samples=1).squeeze(-1)
         # output_seq = F.log_softmax(structure['lm_logits'],dim=-1)
         output_frams = structure['frames'][-1]
-        output_xyz = structure['positions'][-1,...,:3,:3]
+        output_xyz = structure['positions'][-1,...,:3,:]
         output_ptm = structure['ptm']
         output_plddt = structure['plddt'][...,:3]
         output = {
-            "log_softmax_aa":output_seq, 
-            "target_frames":bb_frame ,
+            "log_softmax_aa":output_seq,
+            "aatype": sample_seq.unsqueeze(0),
+            "target_frames":bb_frame,
             "pred_frames": Rigid.from_tensor_7(output_frams) ,
             "positions":output_xyz , 
             "ptm":output_ptm, 
             "plddt":output_plddt,
             "s_s":structure['s_s'],
-            "s_z":structure['s_z']
+            "s_z":structure['s_z'],
         }
         return output
 
