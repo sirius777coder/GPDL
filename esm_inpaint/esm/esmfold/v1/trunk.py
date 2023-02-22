@@ -156,10 +156,14 @@ class FoldingTrunk(nn.Module):
         # where the chunk_size is the size of the chunks, so 128 would mean to parse 128-lengthed chunks.
         self.chunk_size = chunk_size
 
-    def forward(self, dis_embed, bb_frame, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, ):
+    # dis_embed, bb_frame, seq_feats,
+    # def forward(self, dis_embed, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, ):
+
+    def forward(self,  dis_embed, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, ):
         """
         Inputs:
-          dis_embed:     B x L x L x C        tensor of distance embedding to the folding trunk
+          bb_frame       B x L                rigid class of initial frame 
+          NO dis_embed:  B x L x L x C        tensor of distance embedding to the folding trunk
           bb_tensor:     B x L x 4 x 4        tensor of the motif backbone tensors
           seq_feats:     B x L x C            tensor of sequence features
           pair_feats:    B x L x L x C        tensor of pair features
@@ -190,7 +194,7 @@ class FoldingTrunk(nn.Module):
             return s, z
 
         s_s = s_s_0
-        s_z = s_z_0
+        s_z = s_z_0 + dis_embed
         recycle_s = torch.zeros_like(s_s)
         recycle_z = torch.zeros_like(s_z)
         recycle_bins = torch.zeros(
@@ -218,8 +222,9 @@ class FoldingTrunk(nn.Module):
                         s_s), "pair": self.trunk2sm_z(s_z)},
                     true_aa,
                     mask.float(),
-                    initial_bb_frame = bb_frame
+                    
                 )
+                #initial_bb_frame = bb_frame
                 # print(f"Recycling Output")
                 recycle_s = s_s
                 recycle_z = s_z
