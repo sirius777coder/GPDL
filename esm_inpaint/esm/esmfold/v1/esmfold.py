@@ -110,7 +110,8 @@ class ESMFold(nn.Module):
         esm_s = torch.stack([v for _, v in sorted(
             res["representations"].items())], dim=2)
         esm_s = esm_s[:, 1:-1]  # B, L, nLayers, C
-        return esm_s
+        logits = res['logits']
+        return esm_s, logits
 
     def _mask_inputs_to_esm(self, esmaa, pattern):
         new_esmaa = esmaa.clone()
@@ -121,12 +122,15 @@ class ESMFold(nn.Module):
     # bb_frame
     def forward(
         self,
-        dis_embed : torch.Tensor,
+        dis_embed: torch.Tensor,
         aa: torch.Tensor,
         mask: T.Optional[torch.Tensor] = None,
         residx: T.Optional[torch.Tensor] = None,
         masking_pattern: T.Optional[torch.Tensor] = None,
         num_recycles: T.Optional[int] = None,
+        motif_mask: T.Optional[torch.Tensor] = None,
+        save_seq=False,
+        prior_frame=None,
     ):
         """Runs a forward pass given input tokens. Use `model.infer` to
         run inference from a sequence.
@@ -142,6 +146,9 @@ class ESMFold(nn.Module):
                 different masks are provided.
             num_recycles (int): How many recycle iterations to perform. If None, defaults to training max
                 recycles, which is 3.
+            motif_mask (float) : 1 meaning motif positions, 0 meaning scaffold positions, [Batch, Length]
+            save_seq (bool) : whether to save the design sequence
+            prior_frame : frame object [Batch, Length] by zb 
         """
 
         if mask is None:
@@ -160,14 +167,14 @@ class ESMFold(nn.Module):
         if masking_pattern is not None:
             esmaa = self._mask_inputs_to_esm(esmaa, masking_pattern)
 
-        esm_s = self._compute_language_model_representations(esmaa)
+        esm_s, logits = self._compute_language_model_representations(esmaa)
 
         # Convert esm_s to the precision used by the trunk and
         # the structure module. These tensors may be a lower precision if, for example,
         # we're running the language model in fp16 precision.
         esm_s = esm_s.to(self.esm_s_combine.dtype)
 
-        esm_s = esm_s.detach()  # [B, L, self.esm.num_layers + 1]
+        esm_s = esm_s.detach()
 
         # === preprocessing ===
         esm_s = (self.esm_s_combine.softmax(0).unsqueeze(0) @ esm_s).squeeze(2)
@@ -177,10 +184,16 @@ class ESMFold(nn.Module):
 
         s_s_0 += self.embedding(aa)
 
+        if save_seq:
+            des_aa = logits.argmax(dim=-1)  # [B,L]
+            # conserve the motif region
+            des_aa[motif_mask.to(bool)] = aa[motif_mask.to(bool)]
+            aa = des_aa
+
         # structure: dict = self.trunk(
         #     dis_embed, bb_frame, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
         structure: dict = self.trunk(
-            dis_embed, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
+            dis_embed, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles, prior_frame=prior_frame)
         # Documenting what we expect:
         structure = {
             k: v
@@ -240,7 +253,6 @@ class ESMFold(nn.Module):
             compute_predicted_aligned_error(
                 ptm_logits, max_bin=31, no_bins=self.distogram_bins)
         )
-
         return structure
 
     @torch.no_grad()

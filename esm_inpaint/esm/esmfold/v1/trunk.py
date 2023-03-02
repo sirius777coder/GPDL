@@ -159,16 +159,17 @@ class FoldingTrunk(nn.Module):
     # dis_embed, bb_frame, seq_feats,
     # def forward(self, dis_embed, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, ):
 
-    def forward(self,  dis_embed, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, ):
+    def forward(self,  dis_embed, seq_feats, pair_feats, true_aa, residx, mask, no_recycles: T.Optional[int] = None, prior_frame=None):
         """
         Inputs:
-          bb_frame       B x L                rigid class of initial frame 
           NO dis_embed:  B x L x L x C        tensor of distance embedding to the folding trunk
           bb_tensor:     B x L x 4 x 4        tensor of the motif backbone tensors
           seq_feats:     B x L x C            tensor of sequence features
           pair_feats:    B x L x L x C        tensor of pair features
           residx:        B x L                long tensor giving the position in the sequence
           mask:          B x L                boolean tensor indicating valid residues
+          prior_frame       B x L                rigid class of initial frame 
+
 
         Output:
           predicted_structure: B x L x (num_atoms_per_residue * 3) tensor wrapped in a Coordinates object
@@ -222,7 +223,8 @@ class FoldingTrunk(nn.Module):
                         s_s), "pair": self.trunk2sm_z(s_z)},
                     true_aa,
                     mask.float(),
-                    
+                    prior_frame=prior_frame,
+
                 )
                 #initial_bb_frame = bb_frame
                 # print(f"Recycling Output")
