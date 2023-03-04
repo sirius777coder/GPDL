@@ -218,6 +218,7 @@ class FoldingTrunk(nn.Module):
                 # === Structure module ===
                 # print(f"Structure Module")
                 s_z += dis_embed
+                # print(true_aa)
                 structure = self.structure_module(
                     {"single": self.trunk2sm_s(
                         s_s), "pair": self.trunk2sm_z(s_z)},

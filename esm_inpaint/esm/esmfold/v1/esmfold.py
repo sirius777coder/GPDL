@@ -131,6 +131,7 @@ class ESMFold(nn.Module):
         motif_mask: T.Optional[torch.Tensor] = None,
         save_seq=False,
         prior_frame=None,
+        temperature=0.1,
     ):
         """Runs a forward pass given input tokens. Use `model.infer` to
         run inference from a sequence.
@@ -168,6 +169,7 @@ class ESMFold(nn.Module):
             esmaa = self._mask_inputs_to_esm(esmaa, masking_pattern)
 
         esm_s, logits = self._compute_language_model_representations(esmaa)
+        logits = logits[0, 1:-1, :20]  # [L, 20]
 
         # Convert esm_s to the precision used by the trunk and
         # the structure module. These tensors may be a lower precision if, for example,
@@ -183,10 +185,13 @@ class ESMFold(nn.Module):
         s_z_0 = s_s_0.new_zeros(B, L, L, self.cfg.trunk.pairwise_state_dim)
 
         s_s_0 += self.embedding(aa)
-
         if save_seq:
-            des_aa = logits.argmax(dim=-1)  # [B,L]
+            des_aa = torch.multinomial(
+                (logits/temperature).softmax(dim=-1), num_samples=1)  # [L,1]
+            des_aa = des_aa.squeeze().unsqueeze(0)  # [1,L]
             # conserve the motif region
+            # print(f"des aa shape {des_aa.shape},aa shape {aa.shape},motif mask shape {motif_mask.shape}")
+            # print(f"esm_s shape {esm_s.shape}")
             des_aa[motif_mask.to(bool)] = aa[motif_mask.to(bool)]
             aa = des_aa
 
@@ -296,7 +301,7 @@ class ESMFold(nn.Module):
         aatype, mask, residx, linker_mask = map(
             lambda x: x.to(self.device), (aatype, mask, residx, linker_mask)
         )
-        print(aatype)
+        # print(aatype)
         output = self.forward(
             aatype,
             mask=mask,

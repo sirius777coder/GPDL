@@ -185,22 +185,25 @@ class esm_inpaint(nn.Module):
         dis_embed = self.ProteinFeatures(coord, mask * motif_mask)
 
         # stage1 : initialize the prior protein
-        structure = self.esmfold(dis_embed, S, mask, num_recycles=None)
+        structure = self.esmfold(dis_embed, S, mask)
         seq = self.seq_project(self.norm1(structure['s_s']))
         output_seq = F.log_softmax(seq, dim=-1)
-        sample_seq = torch.multinomial(
+        prior_seq = torch.multinomial(
             F.softmax(seq[0], dim=-1), num_samples=1).squeeze(-1)
-        sample_seq[motif_mask.to(bool)] = S[motif_mask.to(bool)]
-        prior_frame = structure['frames'][-1]
-        prior_seq = sample_seq.unsqueeze(0)  # [B,L]
+        prior_seq = prior_seq.unsqueeze(0)  # add the batch = 1 dimension
+        prior_seq[motif_mask.to(bool)] = S[motif_mask.to(bool)]
+        prior_frame = structure['frames'][-1]  # [8, B, L, 4, 4]
 
         # stage2 : sample condition on the prior protein and the motif sequence, structure T steps
         for i in range(T):
-            structure = self.esmfold(
-                dis_embed=dis_embed, aa=prior_seq, mask=mask, motif_mask=motif_mask, prior_frame=prior_frame)
+
+            # structure = self.esmfold(dis_embed=dis_embed, aa=prior_seq, mask=mask, motif_mask=motif_mask, prior_frame=Rigid.from_tensor_7(prior_frame),save_seq=True)
+            structure = self.esmfold(dis_embed=dis_embed, aa=prior_seq, mask=mask,
+                                     motif_mask=motif_mask, prior_frame=None, save_seq=True)
             prior_frame = structure['frames'][-1]
             prior_seq = structure['aatype']
-        return structure
+
+        return self.esmfold.output_to_pdb(structure)
 
     def _froezen(self, patern="min"):
         """

@@ -16,7 +16,6 @@ import time
 import os
 import sys
 import shutil
-import wandb
 import utils
 from argparse import ArgumentParser
 import numpy as np
@@ -46,28 +45,28 @@ parser.add_argument('--mask_aa', type=str, default="A",
                     help="input special mask aa to run esm_ip")
 parser.add_argument('-n', '--num_design', type=int,
                     default=5, help="num of designs")
-parser.add_argument('-T', '--sample steps', type=int,
+parser.add_argument('-T', '--sample_steps', type=int,
                     default=1, help="num of designs")
 args = parser.parse_args()
 
+print(f"{torch.cuda.get_device_name(torch.cuda.current_device())}")
 
 # model = esm.pretrained.esmfold_v1()
 
 # Reading the data file and initialize the esm-inpainting class
-model_path = "/root/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt"
+model_path = "/home/ug2019/ug519111910064/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt"
 # 读取一个pickle文件为一个dict
 model_data = torch.load(str(model_path), map_location="cuda:0")
 cfg = model_data["cfg"]["model"]
 model = modules.esm_inpaint(cfg, chunk_size=64)  # make an instance
 model_state = model_data["model"]
 model.esmfold.load_state_dict(model_state, strict=False)
-model.load_inpaint_dict("./inpaint_weight_0.pt")
+model.load_inpaint_dict("./checkpoints/inpaint_weight_11.pt")
 model = model.eval().cuda()
 
 
 # input : --inpaint_seq A1-3,A4,A6,B10-100
 
-# structure = utils.load_structure(args.input)
 
 inapint_info = []
 motif_mask = ""  # 1 unmasked, 0 masked
@@ -75,11 +74,20 @@ motif_mask = ""  # 1 unmasked, 0 masked
 # parsing the inpaint_seq
 segment = (args.inpaint_seq).split(",")
 for i in range(len(segment)):
+    # scaffold region
     if segment[i][0] not in [chr(ord('a')+_) for _ in range(26)] and segment[i][0] not in [chr(ord('A')+_) for _ in range(26)]:
-        motif_mask += "0" * int(segment[i])
-        inapint_info.append({"mask": int(segment[i])})
-        # Binary tensor with 1 meaning position is unmasked and 0 meaning position is masked.
-    else:
+        if "-" in segment[i]:
+            a, b = segment[i].split("-")
+            a, b = int(a), int(b)
+            if a == 0:
+                a = 1
+            scaffold = np.random.randint(a, b+1)
+        else:
+            scaffold = int(segment[i])
+        motif_mask += "0" * scaffold
+        inapint_info.append({"mask": scaffold})
+        # 1 meaning position is unmasked motif and 0 meaning position is masked scaffold.
+    else:  # motif region
         chain = segment[i][0]
         start, end = (segment[i][1:]).split("-")
         start = int(start)
@@ -121,18 +129,24 @@ for item in inapint_info:
             inpaint_coord[location][3] = np.array(O)
             location += 1
 
-print(inpaint_seq)
+
 seq = torch.tensor([utils.restype_order[i] for i in inpaint_seq],
                    dtype=torch.long).unsqueeze(0).to("cuda:0")
 coord = (torch.from_numpy(inpaint_coord).to(
     torch.float)).unsqueeze(0).to("cuda:0")
 
-output = model.infer(coord, seq, T=args.T, motif_mask="")
-for i in range(len(motif_mask)):
-    if motif_mask[i] == "1":
-        output['aatype'][0][i] = seq[0][i]
-utils.output_to_pdb(output['positions'], output['aatype'],
-                    output['plddt'], file_path=f"{args.output_prefix}.pdb")
+
+with torch.no_grad():
+    output = model.infer(coord, seq, T=args.sample_steps, motif_mask=torch.tensor(
+        [int(i) for i in list(motif_mask)], device=coord.device).unsqueeze(0))
+
+print(motif_mask)
+with open(f"{args.output_prefix}.pdb", "w") as f:
+    f.write(output[0])
+
+# save backbone atom positions
+# utils.output_to_pdb(output['positions'], output['aatype'],
+#                     output['plddt'], file_path=f"{args.output_prefix}.pdb")
 
 
 # Optionally, uncomment to set a chunk size for axial attention. This can help reduce memory.
