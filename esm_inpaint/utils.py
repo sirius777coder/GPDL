@@ -13,6 +13,8 @@ from biotite.structure.residues import get_residues
 from biotite.structure import filter_backbone
 from biotite.structure import get_chains
 from biotite.sequence import ProteinSequence
+import biotite.structure.io as strucio
+import biotite.structure as struc
 import numpy as np
 from scipy.spatial import transform
 from scipy.stats import special_ortho_group
@@ -187,24 +189,13 @@ def loss_smoothed(S, log_probs, mask, weight=0.1, vocab=22):
 
 
 # Biotite module forthe pdb/cif structures
-def load_structure(fpath, chain=None):
+def load_structure(fpath,chain=None):
     """
-    Args:
-        fpath: filepath to either pdb or cif file
-        chain: the chain id or list of chain ids to load
-    Returns:
-        biotite.structure.AtomArray
+    loading atom from the fpath, from the given chain
     """
-    if fpath.endswith('cif'):
-        with open(fpath) as fin:
-            pdbxf = pdbx.PDBxFile.read(fin)
-        structure = pdbx.get_structure(pdbxf, model=1)
-    elif fpath.endswith('pdb'):
-        with open(fpath) as fin:
-            pdbf = pdb.PDBFile.read(fin)
-        structure = pdb.get_structure(pdbf, model=1)
-    bbmask = filter_backbone(structure)
-    structure = structure[bbmask]
+    structure = strucio.load_structure(fpath,model=1)
+    aa_mask = struc.filter_amino_acids(structure)
+    structure = structure[aa_mask]
     all_chains = get_chains(structure)
     if len(all_chains) == 0:
         raise ValueError('No chains found in the input file.')
@@ -213,16 +204,19 @@ def load_structure(fpath, chain=None):
     elif isinstance(chain, list):
         chain_ids = chain
     else:
-        chain_ids = [chain]
+        chain_ids = [chain] 
     for chain in chain_ids:
         if chain not in all_chains:
             raise ValueError(f'Chain {chain} not found in input file')
     chain_filter = [a.chain_id in chain_ids for a in structure]
     structure = structure[chain_filter]
+    # filter the canonical amino acid
+    aa_mask = struc.filter_amino_acids(structure)
+    structure = structure[aa_mask]
     return structure
 
 
-def extract_coords_from_structure(structure: biotite.structure.AtomArray,pattern="min"):
+def extract_coords_from_structure(structure: biotite.structure.AtomArray,pattern="max"):
     """
     Args:
         structure: An instance of biotite AtomArray

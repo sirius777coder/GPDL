@@ -59,14 +59,14 @@ print(f"{torch.cuda.get_device_name(torch.cuda.current_device())}")
 # model = esm.pretrained.esmfold_v1()
 
 # Reading the data file and initialize the esm-inpainting class
-model_path = "/home/ug2019/ug519111910064/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt"
+model_path = "/lustre/home/acct-stu/stu005/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt"
 # 读取一个pickle文件为一个dict
 model_data = torch.load(str(model_path), map_location="cuda:0")
 cfg = model_data["cfg"]["model"]
 model = modules.esm_inpaint(cfg, chunk_size=64)  # make an instance
 model_state = model_data["model"]
 model.esmfold.load_state_dict(model_state, strict=False)
-model.load_inpaint_dict("./checkpoints/inpaint_weight_11.pt")
+model.load_inpaint_dict("/lustre/home/acct-stu/stu005/ESM-Inpainting/esm_inpaint/checkpoints/inpaint_weight_11.pt")
 model = model.eval().cuda()
 
 
@@ -108,7 +108,7 @@ for design in range(args.num_design):
 
     # load the input file by biotite (only standard aa will in this AtomArray)
     structure = utils.load_structure(args.input)
-
+    print(structure[structure.res_id == 92])
     # preliminaries
     inpaint_seq = ""
     inpaint_coord = np.zeros((len(motif_mask), 4, 3))
@@ -129,7 +129,8 @@ for design in range(args.num_design):
                 res_name = ProteinSequence.convert_letter_3to1(
                     get_residues(res_atom_array)[1][0])
                 inpaint_seq += res_name
-
+                print(res_name)
+                print(res_atom_array)
                 inpaint_coord[location][0] = res_atom_array[res_atom_array.atom_name == "N"].coord[0]
                 inpaint_coord[location][1] = res_atom_array[res_atom_array.atom_name == "CA"].coord[0]
                 inpaint_coord[location][2] = res_atom_array[res_atom_array.atom_name == "C"].coord[0]
