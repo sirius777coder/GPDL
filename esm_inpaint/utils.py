@@ -69,6 +69,43 @@ alphabet = {
 alphabet_map = {v:k for k,v in alphabet.items()}
 
 
+def extract_plddt(protein,chain_id=None):
+    if isinstance(protein,str):
+        # model = 1 to load a AtomArray object
+        # extra_fields to load the b_factor column
+        atom_array = strucio.load_structure(protein,model=1,extra_fields=["b_factor"])
+    elif isinstance(protein, struc.AtomArrayStack):
+        atom_array = protein[0]
+    elif isinstance(protein, struc.AtomArray):
+        atom_array = protein
+
+    # add multiple chain sequence subtract function
+    all_chains = get_chains(atom_array)
+    if len(all_chains) == 0:
+        raise ValueError('No chains found in the input file.')
+    if chain_id is None:
+        chain_ids = all_chains
+    elif isinstance(chain_id, list):
+        chain_ids = chain_id
+    else:
+        chain_ids = [chain_id] 
+    for chain in chain_ids:
+        if chain not in all_chains:
+            raise ValueError(f'Chain {chain} not found in input file')
+    chain_filter = [a.chain_id in chain_ids for a in atom_array]
+    atom_array = atom_array[chain_filter]
+
+    # mask canonical aa 
+    aa_mask = struc.filter_canonical_amino_acids(atom_array)
+    atom_array = atom_array[aa_mask]
+
+    # ca atom only
+    atom_array = atom_array[atom_array.atom_name == "CA"]
+
+    plddt = np.array([i.b_factor for i in atom_array])
+
+    return plddt, np.mean(plddt)
+
 def output_to_pdb(positions:torch.Tensor, aatype:torch.Tensor, plddt:torch.Tensor = None, file_path = "result.pdb"):
     """
     Assume batch = 1 (B=1)
