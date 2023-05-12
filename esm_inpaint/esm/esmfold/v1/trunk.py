@@ -219,13 +219,19 @@ class FoldingTrunk(nn.Module):
                 # print(f"Structure Module")
                 s_z += dis_embed
                 # print(true_aa)
+                # structure = self.structure_module(
+                #     {"single": self.trunk2sm_s(
+                #         s_s), "pair": self.trunk2sm_z(s_z)},
+                #     true_aa,
+                #     mask.float(),
+                #     prior_frame=prior_frame,
+
+                # )
                 structure = self.structure_module(
                     {"single": self.trunk2sm_s(
                         s_s), "pair": self.trunk2sm_z(s_z)},
                     true_aa,
                     mask.float(),
-                    prior_frame=prior_frame,
-
                 )
                 #initial_bb_frame = bb_frame
                 # print(f"Recycling Output")

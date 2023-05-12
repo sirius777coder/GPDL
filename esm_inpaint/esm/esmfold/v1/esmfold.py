@@ -88,19 +88,20 @@ class ESMFold(nn.Module):
         return torch.tensor(esm_reorder)
 
     def _af2_idx_to_esm_idx(self, aa, mask):
-        aa = (aa + 1).masked_fill(mask != 1, 0)
+        aa = (aa + 1).masked_fill(mask != 1, 0) #[B, L] token shifted right for padding token
         return self.af2_to_esm[aa]
 
     def _compute_language_model_representations(self, esmaa: torch.Tensor) -> torch.Tensor:
         """Adds bos/eos tokens for the language model, since the structure module doesn't use these."""
-        batch_size = esmaa.size(0)
+        batch_size = esmaa.size(0) 
+        # esmaa [B,L]
 
         bosi, eosi = self.esm_dict.cls_idx, self.esm_dict.eos_idx
-        bos = esmaa.new_full((batch_size, 1), bosi)
-        eos = esmaa.new_full((batch_size, 1), self.esm_dict.padding_idx)
+        bos = esmaa.new_full((batch_size, 1), bosi) #[B,1] full with bosi
+        eos = esmaa.new_full((batch_size, 1), self.esm_dict.padding_idx) #[B,1] full with padding_idx as we may not know the exact length of each token
         esmaa = torch.cat([bos, esmaa, eos], dim=1)
         # Use the first padding index as eos during inference.
-        esmaa[range(batch_size), (esmaa != 1).sum(1)] = eosi
+        esmaa[range(batch_size), (esmaa != 1).sum(1)] = eosi #[B,L+2]
 
         res = self.esm(
             esmaa,
@@ -169,7 +170,7 @@ class ESMFold(nn.Module):
             esmaa = self._mask_inputs_to_esm(esmaa, masking_pattern)
 
         esm_s, logits = self._compute_language_model_representations(esmaa)
-        logits = logits[0, 1:-1, :20]  # [L, 20]
+        logits = logits[0, 1:-1, :20]  # [L, 20], 0 is <bos> token and -1 is <eos> token
 
         # Convert esm_s to the precision used by the trunk and
         # the structure module. These tensors may be a lower precision if, for example,
@@ -197,6 +198,8 @@ class ESMFold(nn.Module):
 
         # structure: dict = self.trunk(
         #     dis_embed, bb_frame, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
+        # structure: dict = self.trunk(
+        #     dis_embed, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles, prior_frame=prior_frame)
         structure: dict = self.trunk(
             dis_embed, s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles, prior_frame=prior_frame)
         # Documenting what we expect:
