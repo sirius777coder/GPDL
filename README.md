@@ -13,5 +13,6 @@ Note that this is an ongoing project and many work still needs to be done.
 ![GPDL](./img/inpaint.png)
 
 -----
-Author : Bo Zhang, Kexin Liu, Zhuoqi Zheng,
+Author : Bo Zhang, Kexin Liu, Zhuoqi Zheng
+
 E-mail : {zhangbo777,lkxlkx,h2knight}@sjtu.edu.cn
