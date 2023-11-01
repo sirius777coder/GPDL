@@ -19,8 +19,8 @@ Note that this is an ongoing project and many work still needs to be done.
 If you use the framework in your research, please cite the following paper.
 ```
 @article {GPDL,
-    Author = {Bo, Zhang and Kexin, Liu and Zhuoqi, Zheng and Yunfeiyang, Liu and Ting, Wei and Haifeng, Chen},  
-    title = {Protein Language Model Supervised Precise and Efficient Protein Backbone Design Method},  
+    Author={Bo, Zhang and Kexin, Liu and Zhuoqi, Zheng and Yunfeiyang, Liu and Ting, Wei and Haifeng, Chen},  
+    title={Protein Language Model Supervised Precise and Efficient Protein Backbone Design Method},  
     year={2023},
     doi={10.1101/2023.10.26.564121},
     url={https://www.biorxiv.org/content/10.1101/2023.10.26.564121v1},
