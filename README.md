@@ -53,7 +53,7 @@ The following parameters can be specified in the Python command :
 
 
 
-## 🚀Hallucination tutorial
+## 🚢Hallucination tutorial
 - GPDL-Hallucination utilized the ESMFold to generate backbones prediction and optimize the intermediate iteratively. The optimization involved introducing mutations to a previously accepted sequence and updating the sequence based on pre-defined criteria (motif RMSD and pLDDT, van der waal radius in some cases)
 
 To quickly run 100 design trajectories for scaffolding the 1BCF binding interface using 1500 steps of gradient descent, one can run the bash file `./gpdl_inpaint_sample.sh` in a slrum system or using the following command:
