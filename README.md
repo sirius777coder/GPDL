@@ -1,11 +1,15 @@
 # GPDL (Generative Protein Design by Language-model)
-----
+
+[Protein Language Model Supervised Precise and Efficient Protein Backbone Design Method
+](https://www.biorxiv.org/content/10.1101/2023.10.26.564121v1)
+
 ![GPDL](./img/img.png)
 
 GPDL is a deep learning method to **design novel and high quality scaffold backbone** given the desired motif residue topologies and sequences. Included in this code repository are two distinct methods, each offering a balance between generation speed and output quality.
-## Environment set-up
+## 💻Environment set-up
+### Conda environment
 ```
-# install esmfold and openfold environment
+# install esmfold and openfold 
 conda create -n gpdl python=3.8
 conda activate gpdl
 conda install pip
@@ -14,8 +18,11 @@ pip install "fair-esm[esmfold]"
 pip install 'dllogger @ git+https://github.com/NVIDIA/dllogger.git'
 pip install 'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307'
 ```
+### Third party source code
+Our repo keeps a fork of ProteinMPNN in `./ProteinMPNN`. Our conda environment is sufficient for running the ProteinMPNN codes to generate sequences compatible with our backbones.
 
-## Inpainting tutorial
+
+## 🚀Inpainting tutorial
 
 - GPDL-Inpainting employs a fine-tuned ESMFold module, specializing in the generation of scaffold proteins tailored to functional sites, a process also known as $s,t \sim f_{\theta}(\hat{s},\hat{t})$ , where  $s,\hat{s},t,\hat{t}$ represent the entire sequence, the complete structures, motif sequences, and motif structures, respectively. Here, $f_{\theta}$ denotes the ESM-Inpainting network along with its parameters.
 
@@ -46,7 +53,7 @@ The following parameters can be specified in the Python command :
 
 
 
-## Hallucination tutorial
+## 🚀Hallucination tutorial
 - GPDL-Hallucination utilized the ESMFold to generate backbones prediction and optimize the intermediate iteratively. The optimization involved introducing mutations to a previously accepted sequence and updating the sequence based on pre-defined criteria (motif RMSD and pLDDT, van der waal radius in some cases)
 
 To quickly run 100 design trajectories for scaffolding the 1BCF binding interface using 1500 steps of gradient descent, one can run the bash file `./gpdl_inpaint_sample.sh` in a slrum system or using the following command:
@@ -74,7 +81,7 @@ python3 ./gpdl_hallucination/hallucination_v1.py \
 
 
 ---
-## Citing this work
+## ✏️Citation
 If you use the framework in your research, please cite the following paper.
 ```
 @article {GPDL,
