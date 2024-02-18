@@ -49,7 +49,7 @@ parser.add_argument('--mask_aa', type=str, default="A",
 parser.add_argument('--fpath', type=str, default="./loc.txt",
                     help="fpath to note the sequence location of motif in each design")
 parser.add_argument('-n', '--num_design', type=int,
-                    default=5, help="num of designs")
+                    default=1, help="num of designs")
 parser.add_argument('-T', '--sample_steps', type=int,
                     default=1, help="num of designs")
 args = parser.parse_args()

@@ -17,7 +17,7 @@ t_init=time.time()
 args = inference_v1.get_args()
 atoms = (args.atom).split(',')
 # load model
-logging.info("Loading model")
+logging.info(f"Loading model")
 # esm_model = esm.pretrained.esmfold_v1()
 # esm_model = esm_model.eval().cuda()
 
@@ -65,7 +65,7 @@ else:
 if not os.path.exists(args.output_dir):
     os.mkdir(args.output_dir)
 
-print('start hal')
+logging.info(f'start hal')
 
 AA_freq = {'A': 0.07421620506799341,
  'R': 0.05161448614128464,
@@ -122,22 +122,26 @@ for motif_idx,i in enumerate(motif_id):
                 coord.append(pos.get_coord())
 ref = np.array(coord)
 
-num = 0
-sequences = []
-while num < args.number:
-    mask_seq=[]
-    for i in range(0,len(mask_len)):
-        mask_seq.append(''.join(np.random.choice(list(AA_freq.keys()), size=mask_len[i], p=list(AA_freq.values()))))
-    des_seq=''
-    for i in range(0,len(motif_id)):
-        des_seq+=mask_seq[i]+motif_seq[i]
-    des_seq+=mask_seq[i+1]
-    if des_seq not in sequences:
-        print(des_seq)
-        sequences.append(des_seq)
-        # print(motif_seq)
-        des_len = len(des_seq)
-        num+=1
+
+if args.pre_sequence is None:
+    num = 0
+    sequences = []
+    while num < args.number:
+        mask_seq=[]
+        for i in range(0,len(mask_len)):
+            mask_seq.append(''.join(np.random.choice(list(AA_freq.keys()), size=mask_len[i], p=list(AA_freq.values()))))
+        des_seq=''
+        for i in range(0,len(motif_id)):
+            des_seq+=mask_seq[i]+motif_seq[i]
+        des_seq+=mask_seq[i+1]
+        if des_seq not in sequences:
+            logging.info(f"{des_seq}")
+            sequences.append(des_seq)
+            des_len = len(des_seq)
+            num+=1
+else:
+    logging.info(f"Using pre-defined sequences {args.pre_sequence}")
+    sequences = [args.pre_sequence for _ in range(args.number)]
 
 des_seqs=[]
 for i, des_seq in enumerate(sequences):
@@ -161,16 +165,16 @@ for i, des_seq in enumerate(sequences):
         if i == 0: # do a first pass through the network before mutating anything -- baseline
             rmsd,rot,tran=loss.get_rmsd(ref,des_coord)
             logging.info(f"RMSD is {rmsd}")
-            print("plddt is", plddt)
+            logging.info(f"plddt is {plddt}")
             current_loss=100-plddt+args.loss*rmsd
-            print('current loss is',current_loss)
-            print(args.loss,args.t1,args.t2)
+            logging.info(f"current loss is {current_loss}")
+            logging.info(f"{args.loss},{args.t1},{args.t2}")
         else:
             #introduce mutation
             sites=mutate.select_positions(plddts,n_mutation,dm_id, des_len, option='r')
-            print(f'mut{i} mutation sites:',sites)
+            logging.info(f'mut{i} mutation sites: {sites}')
             mut_seq=mutate.random_mutate(des_seq,sites)
-            print(f'mut{i} seq:',mut_seq)
+            logging.info(f'mut{i} seq: {mut_seq}')
             seq = SeqRecord(Seq(mut_seq),id=f"mut{i}",description="")
             records = [seq]
             mut_fas=f"{args.output_dir}/{num}_mut{i}.fas"
@@ -183,13 +187,13 @@ for i, des_seq in enumerate(sequences):
             try_loss=100-mut_plddt+args.loss*mut_rmsd
 
             delta = try_loss - current_loss
-            print('current loss is',current_loss)
-            print('try loss is',try_loss,i)
+            logging.info(f'current loss is {current_loss}')
+            logging.info(f'try loss is {try_loss}, {i}')
 
             # If the new solution is better, accept it.
             if delta < 0:
                 accepted = True
-                print("do accept")
+                logging.info(f"do accept")
                 current_loss = try_loss # accept loss change
                 des_seq=mut_seq # accept the mutation
                 rmsd=mut_rmsd
@@ -200,13 +204,13 @@ for i, des_seq in enumerate(sequences):
 
                 if np.random.uniform(0, 1) < np.exp( -delta / T):
                     accepted = True
-                    print("do accept")
+                    logging.info(f"do accept")
                     current_loss = try_loss # accept loss change
                     des_seq=mut_seq # accept the mutation
 
                 else:
                     accepted = False
-                    print('not accept')
+                    logging.info(f'not accept')
 
     des_seqs.append(des_seq)
 
@@ -219,6 +223,6 @@ for i, des_seq in enumerate(sequences):
     save_path,pdb, des_coord,plddt,plddts=main(esm_model,design_fas,f'final_des{num}',dm_id)
     save_path.write_text(pdb)
     final_rmsd,rot,tran=loss.get_rmsd(ref,des_coord)
-    print(f'****** final_des{num}: ',f'motif_RMSD:{final_rmsd}',f'plddt:{plddt} *******')
+    logging.info(f'****** final_des{num}: ',f'motif_RMSD:{final_rmsd}',f'plddt:{plddt} *******')
     t_end=time.time()
-print('all time used',t_end-t_init,"second")
+logging.info(f'all time used',t_end-t_init,"second")

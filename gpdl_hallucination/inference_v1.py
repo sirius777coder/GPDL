@@ -46,6 +46,13 @@ def create_batched_sequence_datasest(
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '--pre_sequence', type=str,default=None,
+        help=
+        """
+        where the pre_sequence is stored
+        """
+    )
+    parser.add_argument(
         '--reference', type=lambda x: os.path.expanduser(str(x)),
         help=
         """

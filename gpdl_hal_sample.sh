@@ -11,7 +11,7 @@
 module load miniconda3
 source activate esmfold
 
-python3 ./gpdl_hallucination/hal_esm-III.py \
+python3 ./gpdl_hallucination/hal_esm-v1.py \
     --reference /path_of_reference.pdb \
     --output_dir /output_folder \
     --step 1500 \
