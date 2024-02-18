@@ -74,7 +74,7 @@ def get_nvidia_driver_version():
 #     print("Unable to retrieve the driver version.")
 print(f"{torch.cuda.get_device_name(torch.cuda.current_device())}")
 # Reading the data file and initialize the esm-inpainting class
-model_path = "/lustre/home/acct-stu/stu005/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt"
+model_path =  os.path.expanduser("~/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 print(torch.cuda.is_available())
@@ -84,7 +84,7 @@ cfg = model_data["cfg"]["model"]
 model = modules.esm_inpaint(cfg, chunk_size=64)  # make an instance
 model_state = model_data["model"]
 model.esmfold.load_state_dict(model_state, strict=False)
-model.load_inpaint_dict("/lustre/home/acct-stu/stu005/ESM-Inpainting/esm_inpaint/checkpoints/inpaint_weight_11.pt")
+model.load_inpaint_dict("checkpoints/inpaint_weight_11.pt")
 model = model.to(device)
 model = model.eval()
 
