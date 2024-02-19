@@ -52,9 +52,11 @@ parser.add_argument('-n', '--num_design', type=int,
                     default=1, help="num of designs")
 parser.add_argument('-T', '--sample_steps', type=int,
                     default=1, help="num of designs")
+# parser.add_argument("--weight_path", type=str,help="path to the model parameters file")
 args = parser.parse_args()
 
-# model = esm.pretrained.esmfold_v1()
+
+
 
 import subprocess
 
@@ -72,19 +74,18 @@ def get_nvidia_driver_version():
 #     print(f"NVIDIA GPU driver version: {driver_version}")
 # else:
 #     print("Unable to retrieve the driver version.")
-print(f"{torch.cuda.get_device_name(torch.cuda.current_device())}")
 # Reading the data file and initialize the esm-inpainting class
 model_path =  os.path.expanduser("~/.cache/torch/hub/checkpoints/esmfold_3B_v1.pt")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
-print(torch.cuda.is_available())
+print(f"using {device} / {torch.cuda.get_device_name(torch.cuda.current_device())}")
+
 # 读取一个pickle文件为一个dict
 model_data = torch.load(str(model_path), map_location=device)
 cfg = model_data["cfg"]["model"]
 model = modules.esm_inpaint(cfg, chunk_size=64)  # make an instance
 model_state = model_data["model"]
 model.esmfold.load_state_dict(model_state, strict=False)
-model.load_inpaint_dict("checkpoints/inpaint_weight_11.pt")
+model.load_inpaint_dict("gpdl_inpainting/checkpoints/inpaint_weight_11.pt")
 model = model.to(device)
 model = model.eval()
 

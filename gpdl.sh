@@ -11,22 +11,28 @@
 module load miniconda3
 source activate esmfold
 
-# pipeline for GPDL
-temp_dir = "./gpdl_inpainting/design/1bcf/1BCF"
+protein_name="1BCF"
+temp_dir="./experiment/${protein_name}"
+temp_dir_inapint="${temp_dir}/inpaint"
+temp_dir_hal="${temp_dir}/hal"
+reference="./gpdl_inpainting/benchmark_set/${protein_name}.pdb"
+if [ ! -d $temp_dir_inapint ]; then
+    mkdir -p $temp_dir_inapint
+fi
 python3 gpdl_inpainting/esm_inference_v2.py  \
-    --inpaint_seq "8-15,A92-99,16-30,A123-130,16-30,A47-54,16-30,A18-25,8-15" \
-    --input ./gpdl_inpainting/benchmark_set/1BCF.pdb \
-    --output_prefix $temp_dir \
-    --fpath "./gpdl_inpainting/design/1bcf/1BCF.txt"
-
+    --inpaint_seq "10,A92-99,20,A123-130,20,A47-54,20,A18-25,10" \
+    --input "${reference}" \
+    --output_prefix "${temp_dir_inapint}/${protein_name}" \
+    --fpath "${temp_dir_inapint}/${protein_name}.txt" \
 # inpainting sequence
-output=$(python3 gpdl_inpainting/utils_seq.py ${temp_dir}_1.pdb)
+output=$(python3 gpdl_inpainting/utils_seq.py ${temp_dir_inapint}/${protein_name}_0.pdb)
+echo $output
 
 # get the protein structure from hallucination
-python3 gpdl_hallucination/hal_esm-v1.py \
-    --pre_sequence  $output \
-    --reference /path_of_reference.pdb \
-    --output_dir /output_folder \
+python3 gpdl_hallucination/hallucination_v1.py \
+    --pre_sequence $output \
+    --reference $reference \
+    --output_dir $temp_dir_hal \
     --step 1500 \
     --loss 10 \
     --t1 1 \

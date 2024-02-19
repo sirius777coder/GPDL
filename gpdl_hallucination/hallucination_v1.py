@@ -142,6 +142,7 @@ if args.pre_sequence is None:
 else:
     logging.info(f"Using pre-defined sequences {args.pre_sequence}")
     sequences = [args.pre_sequence for _ in range(args.number)]
+    des_len = len(args.pre_sequence)
 
 des_seqs=[]
 for i, des_seq in enumerate(sequences):
