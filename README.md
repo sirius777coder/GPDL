@@ -6,8 +6,11 @@
 ![GPDL](./img/img.png)
 
 GPDL is a deep learning method to **design novel and high quality scaffold backbone** given the desired motif residue topologies and sequences. Included in this code repository are two distinct methods, each offering a balance between generation speed and output quality.
+
 ## 💻 Environment set-up
+
 ### Conda environment
+
 ```
 # install esmfold and openfold 
 conda create -n gpdl python=3.8
@@ -19,21 +22,23 @@ pip install "fair-esm[esmfold]"
 pip install 'dllogger @ git+https://github.com/NVIDIA/dllogger.git'
 pip install 'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307'
 ```
+
 ### Third party source code
+
 Our repo keeps a fork of ProteinMPNN in `./ProteinMPNN`. Our conda environment is sufficient for running the ProteinMPNN codes to generate sequences compatible with our backbones.
 
+```
+git clone https://github.com/dauparas/ProteinMPNN.git
+```
 
 ## 🚀 Inpainting tutorial
 
 - GPDL-Inpainting employs a fine-tuned ESMFold module, specializing in the generation of scaffold proteins tailored to functional sites, a process also known as $s,t \sim f_{\theta}(\hat{s},\hat{t})$ , where  $s,\hat{s},t,\hat{t}$ represent the entire sequence, the complete structures, motif sequences, and motif structures, respectively. Here, $f_{\theta}$ denotes the ESM-Inpainting network along with its parameters.
-
 - During the fine-tuning process, only the structure module and certain linear projection layers (such as the distance linear layer and sequence output embedding) undergo training. Other components, including ESM2 and FoldingTrunk, remain fixed.
-
-
 - Typically, GPDL-Inpainting outperforms other backbone generation methods in terms of speed. It is capable of generating approximately 10,000 backbones, each 200 amino acids long, within a single day using a single V100 GPU.
 
-
 Run the bash file `./gpdl_inpaint_sample.sh` in a slrum system or using the following command:
+
 ```
 python3 ./gpdl_inpainting/esm_inference_v2.py  \
     --input ./gpdl_inpainting/benchmark_set/1BCF.pdb \
@@ -43,6 +48,7 @@ python3 ./gpdl_inpainting/esm_inference_v2.py  \
     --num_design 100 \
     --fpath "./gpdl_inpainting/design/1bcf/1BCF.txt"
 ```
+
 The following parameters can be specified in the Python command :
 
 - `input` - This is the target protein data structure that contains motif information.
@@ -52,9 +58,8 @@ The following parameters can be specified in the Python command :
 - `num_design` - The number of designs to be generated.
 - `fpath` - The file path for outputting detailed design information, which is useful for computing metrics like RMSD and pLDDT.
 
-
-
 ## 🔮 Hallucination tutorial
+
 - GPDL-Hallucination utilized the ESMFold to generate backbones prediction and optimize the intermediate iteratively. The optimization involved introducing mutations to a previously accepted sequence and updating the sequence based on pre-defined criteria (motif RMSD and pLDDT, van der waal radius in some cases)
 
 To quickly run 100 design trajectories for scaffolding the 1BCF binding interface using 1500 steps of gradient descent, one can run the bash file `./gpdl_inpaint_sample.sh` in a slrum system or using the following command:
@@ -73,6 +78,7 @@ python3 ./gpdl_hallucination/hallucination_v1.py \
     --motif_id A92-99,A123-130,A47-54,A18-25 \
     --atom N,CA,C,O
 ```
+
 - `reference`: Specifies the path to the template protein structure file.
 - `motif_id`: Identifies the residue ranges within the template that should remain fixed during hallucination.
 - `mask_len`: Defines the number of residues to be hallucinated within each specified range. For example, using --mask_len 10,20,20,20,10 along with --motif_id A92-99, A123-130, A47-54, A18-25 instructs the script to hallucinate sequences of 10, 20, 20, 20, and 10 residues in length, corresponding to and scaffolding around the specified residue ranges in chain A of the template.
@@ -80,10 +86,12 @@ python3 ./gpdl_hallucination/hallucination_v1.py \
 - `step`: Determines the number of steps to be executed during the simulated annealing process.
 - `atom`: Designates which atoms are to be considered when calculating the RMSD in the loss function.
 
-
 ---
+
 ## ✏️ Citation
+
 If you use the framework in your research, please cite the following paper.
+
 ```
 @article {GPDL,
     Author={Bo, Zhang and Kexin, Liu and Zhuoqi, Zheng and Yunfeiyang, Liu and Ting, Wei and Haifeng, Chen},  
@@ -95,7 +103,8 @@ If you use the framework in your research, please cite the following paper.
 }
 ```
 
------
+---
+
 Github codebase author : Bo Zhang, Kexin Liu, Zhuoqi Zheng
 
 E-mail : {zhangbo777,lkxlkx,h2knight}@sjtu.edu.cn
