@@ -8,8 +8,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=6
 
-module load miniconda3
-source activate esmfold
+module load anaconda
+source activate gpdl
 
 python3 ./gpdl_hallucination/hal_esm-v1.py \
     --reference /path_of_reference.pdb \
