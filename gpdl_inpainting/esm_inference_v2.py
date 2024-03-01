@@ -52,7 +52,7 @@ parser.add_argument('-n', '--num_design', type=int,
                     default=1, help="num of designs")
 parser.add_argument('-T', '--sample_steps', type=int,
                     default=1, help="num of designs")
-# parser.add_argument("--weight_path", type=str,help="path to the model parameters file")
+parser.add_argument("--weight_path", type=str,help="path to the model parameters file")
 args = parser.parse_args()
 
 
@@ -85,7 +85,7 @@ cfg = model_data["cfg"]["model"]
 model = modules.esm_inpaint(cfg, chunk_size=64)  # make an instance
 model_state = model_data["model"]
 model.esmfold.load_state_dict(model_state, strict=False)
-model.load_inpaint_dict("gpdl_inpainting/checkpoints/inpaint_weight_11.pt")
+model.load_inpaint_dict(args.weight_path)
 model = model.to(device)
 model = model.eval()
 

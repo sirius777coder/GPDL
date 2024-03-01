@@ -175,7 +175,7 @@ else:
     with open(args.pre_sequence, 'r') as f:
         fasta_string = f.read()
     sequences, de = parse_fasta(fasta_string)
-    des_len = len(args.pre_sequence)
+    des_len = len(sequences[0])
 
 des_seqs=[]
 for i, des_seq in enumerate(sequences):

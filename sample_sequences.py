@@ -13,6 +13,8 @@ import numpy as np
 from pathlib import Path
 import torch
 
+import sys
+sys.path.append("./gpdl_inpainting")
 import esm
 import esm.inverse_folding
 
@@ -27,11 +29,22 @@ def sample_seq_singlechain(model, alphabet, args):
 
     print(f'Saving sampled sequences to {args.outpath}.')
 
+    with open(args.inpaint_file,"r") as f:
+        data = f.readlines()
+    motif_info = eval(data[1].strip())
+    binary_string = ""
+    for item in motif_info:
+        if 'mask' in item:
+            binary_string += '0' * item['mask']
+        else:
+            start, end = item['A']
+            binary_string += '1' * (end - start + 1)
+    partial_seq = [native_seq[i] if binary_string[i] == '1' else '<mask>' for i in range(len(binary_string))]
     Path(args.outpath).parent.mkdir(parents=True, exist_ok=True)
     with open(args.outpath, 'w') as f:
         for i in range(args.num_samples):
             print(f'\nSampling.. ({i+1} of {args.num_samples})')
-            sampled_seq = model.sample(coords, temperature=args.temperature, device=torch.device('cuda'))
+            sampled_seq = model.sample(coords, temperature=args.temperature, partial_seq=partial_seq,device=torch.device('cuda'))
             print('Sampled sequence:')
             print(sampled_seq)
             f.write(f'>sampled_seq_{i+1}\n')
@@ -108,6 +121,7 @@ def main():
             help='use the backbone of only target chain in the input for conditioning'
     )
     parser.add_argument("--nogpu", action="store_true", help="Do not use GPU even if available")
+    parser.add_argument("--inpaint_file", type=str, help="Fixed residue file from inpainting", default=None)
   
     args = parser.parse_args()
 
