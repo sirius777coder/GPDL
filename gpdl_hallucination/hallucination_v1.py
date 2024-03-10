@@ -257,6 +257,6 @@ for i, des_seq in enumerate(sequences):
     save_path,pdb, des_coord,plddt,plddts=main(esm_model,design_fas,f'final_des{num}',dm_id)
     save_path.write_text(pdb)
     final_rmsd,rot,tran=loss.get_rmsd(ref,des_coord)
-    logging.info(f'****** final_des{num}: ',f'motif_RMSD:{final_rmsd}',f'plddt:{plddt} *******')
+    logging.info(f'****** final_des{num}: ,motif_RMSD:{final_rmsd}, plddt:{plddt} *******')
     t_end=time.time()
 logging.info(f'all time used',t_end-t_init,"second")
