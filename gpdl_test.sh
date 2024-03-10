@@ -12,6 +12,7 @@ protein_name="1BCF"
 inpaint_seq="10,A92-99,20,A123-130,20,A47-54,20,A18-25,10"
 mask_len="10,20,20,20,10"
 motif_id="A92-99,A123-130,A47-54,A18-25"
+max_mut=15
 
 temp_dir="./temp/${protein_name}"
 temp_dir_inapint="${temp_dir}/inpaint"
@@ -49,7 +50,7 @@ python3 gpdl_hallucination/hallucination_v1.py \
     --loss 10 \
     --t1 1 \
     --t2 500 \
-    --n_mut_max 20 \
+    --max_mut $max_mut \
     --number $number \
     --mask_len $mask_len \
     --motif_id $motif_id \

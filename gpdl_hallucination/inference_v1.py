@@ -95,10 +95,10 @@ def get_args():
         help="1000 or 500",
     )
     parser.add_argument(
-        "--n_mut_max",
+        "--max_mut",
         type=int,
         default=None,
-        help="20 or more, num of mutations in the initial roundtrip",
+        help="percentage of scaffold substituted in the initial roundtrip",
     )
     parser.add_argument(
         "--number",

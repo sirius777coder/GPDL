@@ -122,7 +122,7 @@ letters = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLU': 'E
 
 mask_len = [int(i) for i in (args.mask_len).split(',')]
 motif_id = (args.motif_id).split(',')
-
+scaf_len = sum(mask_len)
 
 from Bio.PDB import *
 parser = PDBParser()
@@ -188,7 +188,7 @@ for i, des_seq in enumerate(sequences):
 
     save_path,pdb,des_coord,plddt,plddts=main(esm_model,output_fasta,num,dm_id)
 
-    M = np.linspace(args.n_mut_max, 1, args.step) # stepped linear decay of the mutation rate
+    M = np.linspace(round(args.max_mut/100*scaf_len), 1, args.step) # stepped linear decay of the mutation rate
 
     for i in range(args.step):
         # Update a few things.
