@@ -13,6 +13,7 @@ inpaint_seq="10,A92-99,20,A123-130,20,A47-54,20,A18-25,10"
 mask_len="10,20,20,20,10"
 motif_id="A92-99,A123-130,A47-54,A18-25"
 max_mut=15
+step=800
 
 temp_dir="./temp/${protein_name}"
 temp_dir_inapint="${temp_dir}/inpaint"
@@ -46,7 +47,7 @@ python3 gpdl_hallucination/hallucination_v1.py \
     --pre_sequence "${temp_dir_inapint}/${protein_name}.fasta" \
     --reference $reference \
     --output_dir $temp_dir_hal \
-    --step 1500 \
+    --step $step \
     --loss 10 \
     --t1 1 \
     --t2 500 \
