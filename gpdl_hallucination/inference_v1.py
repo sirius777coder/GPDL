@@ -70,6 +70,23 @@ def get_args():
         """
     )
     parser.add_argument(
+        '--final_des_dir', type=lambda x: os.path.expanduser(str(x)),
+        help=
+        """
+        The output directory to write the final designs. 
+        If the directory does not exist, we just create it. 
+        The output file name follows its unique identifier in the 
+        rows of the input fasta file"
+        """
+    )
+    parser.add_argument(
+        '--bb_suffix', type=int,
+        help=
+        """
+        The index of start backbone 
+        """
+    ) 
+    parser.add_argument(
         '--step', type=int,
         help=
         """

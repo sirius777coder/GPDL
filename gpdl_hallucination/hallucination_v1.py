@@ -1,4 +1,5 @@
 import sys, os, argparse, copy, subprocess, glob, time, pickle, json, tempfile, random
+from pathlib import Path
 import numpy as np
 from Bio import *
 import gc
@@ -95,6 +96,9 @@ else:
 
 if not os.path.exists(args.output_dir):
     os.mkdir(args.output_dir)
+
+if not os.path.exists(args.final_des_dir):
+    os.mkdir(args.final_des_dir)
 
 logging.info(f'start hal')
 
@@ -250,13 +254,14 @@ for i, des_seq in enumerate(sequences):
 
     seq = SeqRecord(Seq(des_seq),id=f"final_des",description="")
     records = [seq]
-    design_fas=f"{args.output_dir}/final_des{num}.fas"
+    design_fas=f"{args.final_des_dir}/final_des{args.bb_suffix}_{num}.fas"
     SeqIO.write(records, design_fas, "fasta")
 
     #预测
-    save_path,pdb, des_coord,plddt,plddts=main(esm_model,design_fas,f'final_des{num}',dm_id)
+    save_path,pdb, des_coord,plddt,plddts=main(esm_model,design_fas,f'final_des{args.bb_suffix}_{num}',dm_id)
+    save_path = Path(f"{args.final_des_dir}/final_des{args.bb_suffix}_{num}.pdb")
     save_path.write_text(pdb)
     final_rmsd,rot,tran=loss.get_rmsd(ref,des_coord)
-    logging.info(f'****** final_des{num}: ,motif_RMSD:{final_rmsd}, plddt:{plddt} *******')
+    logging.info(f'****** final_des{args.bb_suffix}_{num}: ,motif_RMSD:{final_rmsd}, plddt:{plddt} *******')
     t_end=time.time()
 logging.info(f'all time used',t_end-t_init,"second")
