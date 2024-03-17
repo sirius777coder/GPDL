@@ -172,10 +172,11 @@ def get_args():
     return args
 
 
-def main(model,output_fasta, num, motif):
+# def main(model,output_fasta, num, motif):
+def main(model,all_sequences, num, motif):
     args = get_args()
     atoms = (args.atom).split(',')
-    all_sequences = sorted(read_fasta(output_fasta), key=lambda header_seq: len(header_seq[1]))
+    # all_sequences = sorted(read_fasta(output_fasta), key=lambda header_seq: len(header_seq[1]))
     # logger.info(f"Loaded {len(all_sequences)} sequences from {output_fasta}")
 
     # logger.info("Starting Predictions")
@@ -211,15 +212,18 @@ def main(model,output_fasta, num, motif):
         if len(sequences) > 1:
             time_string = time_string + f" (amortized, batch size {len(sequences)})"
         coord = np.empty(shape=(0,3), dtype = float) 
-        for header, seq, pdb_string, mean_plddt, ptm in zip(
-            headers, sequences, pdbs, output["mean_plddt"], output["ptm"]
+        for header, seq, pdb_string, mean_plddt, ptm, pae in zip(
+            headers, sequences, pdbs, output["mean_plddt"], output["ptm"], output['predicted_aligned_error']
         ):
             output_file = Path(f"{args.output_dir}/{num}_{header}.pdb")
             # output_file.write_text(pdb_string)
             num_completed += 1
+            mean_pae = torch.mean(pae)
             logger.info(
-                f"Predicted structure for {header} with length {len(seq)}, pLDDT {mean_plddt:0.1f}, "
-                f"pTM {ptm:0.3f} in {time_string}. "
+                f"Predicted structure for {header} with length {len(seq)}"
+                f", pLDDT {mean_plddt:0.1f}, "
+                f"pTM {ptm:0.3f}, "
+                f"pAE {mean_pae:0.1f} in {time_string}."
                 f"{num_completed} / {num_sequences} completed."
             )
 
@@ -244,6 +248,6 @@ def main(model,output_fasta, num, motif):
             for res in plddt.keys():
                 plddts.append(np.mean(plddt[res]))                          
     # save_path = output_file
-    return output_file,pdb_string, coord, mean_plddt, plddts
+    return output_file,pdb_string, coord, mean_plddt, plddts, ptm, mean_pae
 
 
