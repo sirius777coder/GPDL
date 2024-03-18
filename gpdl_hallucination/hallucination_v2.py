@@ -227,7 +227,7 @@ for i, des_seq in enumerate(sequences):
 for num,des_seq in enumerate(des_seqs):
     seq = SeqRecord(Seq(des_seq),id=f"final_des",description="")
     records = [seq]
-    design_fas=f"{args.output_dir}/final_des{num}.fas"
+    design_fas=f"{args.final_des_dir}/final_des{args.bb_suffix}_{num}.fas"
     SeqIO.write(records, design_fas, "fasta")
 
     #预测

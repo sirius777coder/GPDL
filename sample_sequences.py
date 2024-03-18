@@ -37,7 +37,8 @@ def sample_seq_singlechain(model, alphabet, args):
         if 'mask' in item:
             binary_string += '0' * item['mask']
         else:
-            start, end = item['A']
+            chain_name = list(item.keys())[0]
+            start, end = item[chain_name]
             binary_string += '1' * (end - start + 1)
     partial_seq = [native_seq[i] if binary_string[i] == '1' else '<mask>' for i in range(len(binary_string))]
     Path(args.outpath).parent.mkdir(parents=True, exist_ok=True)
