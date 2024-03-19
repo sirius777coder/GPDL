@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=7MRX_60_240319
+#SBATCH --job-name=7MRX_128_240319
 #SBATCH --partition=dgx2
 #SBATCH --output=%j.out
 #SBATCH --error=%j.err
@@ -11,9 +11,9 @@
 module load miniconda3
 source activate esmfold
 
-protein_name="7MRX_60"
-inpaint_seq="19,B25-46,19"
-mask_len="19,19"
+protein_name="7MRX_128"
+inpaint_seq="53,B25-46,53"
+mask_len="53,53"
 motif_id="B25-46"
 max_mut=15
 step=800
