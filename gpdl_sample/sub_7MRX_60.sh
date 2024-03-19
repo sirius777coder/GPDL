@@ -33,6 +33,9 @@ fi
 if [ ! -d $temp_dir_hal ]; then
     mkdir -p $temp_dir_hal
 fi
+if [ ! -d $final_des_dir ]; then
+    mkdir -p $final_des_dir
+fi
 
 python3 /lustre/home/acct-stu/stu006/GPDL/GPDL/gpdl_inpainting/esm_inference_v2.py  \
     --inpaint_seq "${inpaint_seq}" \
