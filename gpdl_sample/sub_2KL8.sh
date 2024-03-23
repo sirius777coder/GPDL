@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=2KL8_240317
+#SBATCH --job-name=2KL8_240319
 #SBATCH --partition=dgx2
 #SBATCH --output=%j.out
 #SBATCH --error=%j.err
@@ -17,13 +17,14 @@ mask_len="0,20,0"
 motif_id="A1-7,A28-79"
 max_mut=15
 step=800
+date=240319
 
-temp_dir="/lustre/home/acct-stu/stu006/GPDL/temp/${protein_name}"
+temp_dir="/lustre/home/acct-stu/stu006/GPDL/temp/${date}/${protein_name}"
 temp_dir_inpaint="${temp_dir}/inpaint"
 temp_dir_hal="${temp_dir}/hal"
-final_des_dir="/lustre/home/acct-stu/stu006/GPDL/240312/${protein_name}"
+final_des_dir="/lustre/home/acct-stu/stu006/GPDL/${date}/${protein_name}"
 reference="/lustre/home/acct-stu/stu006/protein_ref/${protein_name}.pdb"
-inp_num=10
+inp_num=100
 if_num=1
 hal_num=1
 
