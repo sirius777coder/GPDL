@@ -1,12 +1,12 @@
-import sys, os, argparse, copy, subprocess, glob, time, pickle, json, tempfile, random
+import sys, os, argparse, copy, subprocess, glob, pickle, json, tempfile, random
+# import time
 from pathlib import Path
 import numpy as np
 from Bio import *
-import gc
+# import gc
 import logging
 import torch
 import esm
-import os
 
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -14,7 +14,7 @@ from Bio import SeqIO
 
 import inference_v1,loss,mutate
 from inference_v1 import main
-t_init=time.time()
+# t_init=time.time()
 args = inference_v1.get_args()
 atoms = (args.atom).split(',')
 # load model
@@ -181,10 +181,11 @@ else:
     sequences, de = parse_fasta(fasta_string)
     des_len = len(sequences[0])
 
-des_seqs=[]
-for i, des_seq in enumerate(sequences):
+des_seqs = []
+fst_suc_step = []
+for init_seq_idx, des_seq in enumerate(sequences):
     traj = []
-    num = i
+    num = init_seq_idx
     # # write sequence into fas
     # seq0 = SeqRecord(Seq(des_seq),id="init_seq",description="")
     # my_records = [seq0]
@@ -257,14 +258,20 @@ for i, des_seq in enumerate(sequences):
                     logging.info(f"do accept")
                     current_loss = try_loss # accept loss change
                     des_seq=mut_seq # accept the mutation
+                    rmsd=mut_rmsd
+                    plddt=mut_plddt
 
                 else:
                     accepted = False
                     logging.info(f'not accept')
 
             traj.append((i, desc, des_seq, pdb, mut_rmsd, mut_plddt, mean_pae, ptm, accepted))
+            
+        if rmsd < 1 and plddt > 80:
+            break
 
     des_seqs.append(des_seq)
+    fst_suc_step.append(i)
     
     with open(f"{args.output_dir}/{args.bb_suffix}_{num}.pkl", 'wb') as f:
         pickle.dump(traj, f)
@@ -284,5 +291,14 @@ for i, des_seq in enumerate(sequences):
     final_rmsd,rot,tran=loss.get_rmsd(ref,des_coord)
     logging.info(f'****** final_des{args.bb_suffix}_{num}: ,motif_RMSD:{final_rmsd}, plddt:{plddt} *******')
     t_end=time.time()
-t_total = t_end-t_init
-logging.info(f'all time used {t_total} second')
+
+if len(des_seqs) != len(fst_suc_step):
+    raise ValueError('different length of designed sequences with first success step list')
+else:
+    for i, seq in enumerate(fst_suc_step):
+        with open(f"{args.output_dir}/early_stop_steps_{i}", 'wb') as f:
+            f.write(f'{fst_suc_step[i]}')
+        
+    
+# t_total = t_end-t_init
+# logging.info(f'all time used {t_total} second')
