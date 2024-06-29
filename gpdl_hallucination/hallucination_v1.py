@@ -267,8 +267,9 @@ for init_seq_idx, des_seq in enumerate(sequences):
 
             traj.append((i, desc, des_seq, pdb, mut_rmsd, mut_plddt, mean_pae, ptm, accepted))
             
-        if rmsd < 1 and plddt > 80:
-            break
+        if args.earlystop:
+            if rmsd < 1 and plddt > 80:
+                break
 
     des_seqs.append(des_seq)
     fst_suc_step.append(i)
