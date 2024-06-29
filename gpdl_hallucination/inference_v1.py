@@ -142,6 +142,10 @@ def get_args():
         help="N,CA,C,O",
     )
     parser.add_argument(
+        '--earlystop', 
+        action='store_true', 
+        help='Enable early stopping')
+    parser.add_argument(
         "--num-recycles",
         type=int,
         default=None,
