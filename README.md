@@ -21,6 +21,15 @@ conda install -c conda-forge biotite
 pip install "fair-esm[esmfold]"
 pip install 'dllogger @ git+https://github.com/NVIDIA/dllogger.git'
 pip install 'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307'
+
+# install esm_if
+conda create -n esm_if python=3.9
+conda activate esm_if
+conda install pytorch cudatoolkit=11.3 -c pytorch
+conda install pyg -c pyg -c conda-forge
+conda install pip
+pip install biotite
+pip install git+https://github.com/facebookresearch/esm.git
 ```
 
 ### Third party source code
@@ -31,62 +40,17 @@ Our repo keeps a fork of ProteinMPNN in `./ProteinMPNN`. Our conda environment i
 git clone https://github.com/dauparas/ProteinMPNN.git
 ```
 
-## 🚀 Inpainting tutorial
 
-- GPDL-Inpainting employs a fine-tuned ESMFold module, specializing in the generation of scaffold proteins tailored to functional sites, a process also known as $s,t \sim f_{\theta}(\hat{s},\hat{t})$ , where  $s,\hat{s},t,\hat{t}$ represent the entire sequence, the complete structures, motif sequences, and motif structures, respectively. Here, $f_{\theta}$ denotes the ESM-Inpainting network along with its parameters.
-- During the fine-tuning process, only the structure module and certain linear projection layers (such as the distance linear layer and sequence output embedding) undergo training. Other components, including ESM2 and FoldingTrunk, remain fixed.
-- Typically, GPDL-Inpainting outperforms other backbone generation methods in terms of speed. It is capable of generating approximately 10,000 backbones, each 200 amino acids long, within a single day using a single V100 GPU.
+## 🔮 GPDL tutorial
+GPDL takes three-steps module by inpaitning-fix bb design-hallucination in `example.sh`. Usually it needs 30 minutes for 100 backbones to generate protein scaffolds. Here is the bash parameters:
+1. `protein_name` - Output path prefix
+2. `dir_name` - Usually same as `protein_name
+3. `inpaint_seq` - This defines the motif information format, like `"x-y,Ax-y,m-n"`, where x,y indicate the length range of scaffold samples needed. For each design ,a random number N is sampled from  $N \sim $ Uniform[x,y]. The motif position begins from A chain residue x to y residue y
+4. `mask_len` - Defines the number of residues to be hallucinated within each specified range. For example, using --mask_len 10,20,20,20,10 along with --motif_id A92-99, A123-130, A47-54, A18-25 instructs the script to hallucinate sequences of 10, 20, 20, 20, and 10 residues in length, corresponding to and scaffolding around the specified residue ranges in chain A of the template.
+5. `motif_id` - Identifies the residue ranges within the template that should remain fixed during hallucination.
+6. `max_mut`- Maximum residues can be mutated.
+7. `step` - MCMC iterations.
 
-Run the bash file `./gpdl_inpaint_sample.sh` in a slrum system or using the following command:
-
-```
-python3 ./gpdl_inpainting/esm_inference_v2.py  \
-    --input ./gpdl_inpainting/benchmark_set/1BCF.pdb \
-    --output_prefix "./gpdl_inpainting/design/1bcf/1BCF" \
-    --inpaint_seq "8-15,A92-99,16-30,A123-130,16-30,A47-54,16-30,A18-25,8-15" \
-    --sample_steps 1 \
-    --num_design 100 \
-    --fpath "./gpdl_inpainting/design/1bcf/1BCF.txt"
-```
-
-The following parameters can be specified in the Python command :
-
-- `input` - This is the target protein data structure that contains motif information.
-- `output_prefix` - The format for the backbone output, such as `output_prefix_1.pdb`,`output_prefix_2.pdb`.
-- `inpaint_seq` -  This defines the motif information format, like `"x-y,Ax-y,m-n"`, where x,y indicate the length range of scaffold samples needed. For each design ,a random number N is sampled from  $N \sim $ Uniform[x,y]. The motif position begins from A chain residue x to y residue y.
-- `sample_steps` - The number of ESMFold cycles in the inpainting program. It is generally recommended to set this to 1 for most tasks.
-- `num_design` - The number of designs to be generated.
-- `fpath` - The file path for outputting detailed design information, which is useful for computing metrics like RMSD and pLDDT.
-
-## 🔮 Hallucination tutorial
-
-- GPDL-Hallucination utilized the ESMFold to generate backbones prediction and optimize the intermediate iteratively. The optimization involved introducing mutations to a previously accepted sequence and updating the sequence based on pre-defined criteria (motif RMSD and pLDDT, van der waal radius in some cases)
-
-To quickly run 100 design trajectories for scaffolding the 1BCF binding interface using 1500 steps of gradient descent, one can run the bash file `./gpdl_inpaint_sample.sh` in a slrum system or using the following command:
-
-```
-python3 ./gpdl_hallucination/hallucination_v1.py \
-    --reference /path_of_reference.pdb \
-    --output_dir /output_folder \
-    --step 1500 \
-    --loss 10 \
-    --t1 1 \
-    --t2 500 \
-    --n_mut_max 20 \
-    --number 100 \
-    --mask_len 10,20,20,20,10 \
-    --motif_id A92-99,A123-130,A47-54,A18-25 \
-    --atom N,CA,C,O
-```
-
-- `reference`: Specifies the path to the template protein structure file.
-- `motif_id`: Identifies the residue ranges within the template that should remain fixed during hallucination.
-- `mask_len`: Defines the number of residues to be hallucinated within each specified range. For example, using --mask_len 10,20,20,20,10 along with --motif_id A92-99, A123-130, A47-54, A18-25 instructs the script to hallucinate sequences of 10, 20, 20, 20, and 10 residues in length, corresponding to and scaffolding around the specified residue ranges in chain A of the template.
-- `t1` and `t2`: These parameters set the initial temperature for simulated annealing (--t1) and the half-life for the temperature decay (--t2), respectively.
-- `step`: Determines the number of steps to be executed during the simulated annealing process.
-- `atom`: Designates which atoms are to be considered when calculating the RMSD in the loss function.
-
----
 
 ## ✏️ Citation
 
