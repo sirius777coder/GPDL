@@ -113,7 +113,6 @@ class TransformerDecoder(nn.Module):
                 - the decoder's output of shape `(batch, tgt_len, vocab)`
                 - a dictionary with any model-specific outputs
         """
-
         x, extra = self.extract_features(
             prev_output_tokens,
             encoder_out=encoder_out,

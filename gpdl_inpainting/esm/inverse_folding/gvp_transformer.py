@@ -103,6 +103,10 @@ class GVPTransformerModel(nn.Module):
         batch_coords, confidence, _, _, padding_mask = (
             batch_converter([(coords, confidence, None)])
         )
+        device = next(self.parameters()).device
+        batch_coords = batch_coords.to(device)
+        padding_mask = padding_mask.to(device)
+        confidence = confidence.to(device)
         
         # Start with prepend token
         mask_idx = self.decoder.dictionary.get_idx('<mask>')
@@ -111,7 +115,7 @@ class GVPTransformerModel(nn.Module):
         if partial_seq is not None:
             for i, c in enumerate(partial_seq):
                 sampled_tokens[0, i+1] = self.decoder.dictionary.get_idx(c)
-            
+        sampled_tokens = sampled_tokens.to(device)
         # Save incremental states for faster sampling
         incremental_state = dict()
         

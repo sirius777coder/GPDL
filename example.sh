@@ -39,7 +39,7 @@ python3 ./gpdl_inpainting/esm_inference_v2.py  \
 
 for i in $(seq 0 $((inp_num-1)))
 do
-    echo $i
+    echo "optimization numbers : $i"
     # fixed-bb design for inpainted sequence
     conda activate esm_if
     python ./sample_sequences.py ${temp_dir_inpaint}/${protein_name}_${i}.pdb \
