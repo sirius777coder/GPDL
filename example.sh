@@ -1,8 +1,8 @@
 
 source activate
-conda activate protein_design
+conda activate gpdl
 
-
+# parameters and paths 
 protein_name="2FYD"
 dir_name="2FYD" # for different length scale
 inpaint_seq="50,D297-311,50"
@@ -48,7 +48,7 @@ do
         --inpaint_file "${temp_dir_inpaint}/${protein_name}.txt"
 
     # get the protein structure from hallucination
-    conda activate protein_design
+    conda activate gpdl
     python3 ./gpdl_hallucination/hallucination_v1.py \
         --pre_sequence "${temp_dir_inpaint}/${protein_name}_${i}_esmif.fasta" \
         --reference $reference \
