@@ -1,7 +1,6 @@
-# GPDL (Generative Protein Design by Language-model)
+<h1 align="center">GPDL</h1>
+<p align="center">Generative Protein Design by Language model</p>
 
-[Protein Language Model Supervised Precise and Efficient Protein Backbone Design Method
-](https://www.biorxiv.org/content/10.1101/2023.10.26.564121v1)
 
 ![GPDL](./img/img.png)
 
@@ -42,15 +41,18 @@ git clone https://github.com/dauparas/ProteinMPNN.git
 
 
 ## 🔮 GPDL tutorial
-GPDL takes three-steps module by inpaitning-fix bb design-hallucination in `example.sh`. Usually it needs 30 minutes for 100 backbones to generate protein scaffolds. Here is the bash parameters:
+GPDL takes three-steps module by seeding-fix bb design-optimization in `example.sh`. Usually it needs 30 minutes for 100 backbones to generate protein scaffolds. Here is the bash parameters:
 1. `protein_name` - Output path prefix
-2. `dir_name` - Usually same as `protein_name
-3. `inpaint_seq` - This defines the motif information format, like `"x-y,Ax-y,m-n"`, where x,y indicate the length range of scaffold samples needed. For each design ,a random number N is sampled from  $N \sim $ Uniform[x,y]. The motif position begins from A chain residue x to y residue y
-4. `mask_len` - Defines the number of residues to be hallucinated within each specified range. For example, using --mask_len 10,20,20,20,10 along with --motif_id A92-99, A123-130, A47-54, A18-25 instructs the script to hallucinate sequences of 10, 20, 20, 20, and 10 residues in length, corresponding to and scaffolding around the specified residue ranges in chain A of the template.
-5. `motif_id` - Identifies the residue ranges within the template that should remain fixed during hallucination.
-6. `max_mut`- Maximum residues can be mutated.
-7. `step` - MCMC iterations.
-
+2. `dir_name` - Usually same as `protein_name`
+3. `inpaint_seq` - This defines the motif information format, like `"m,Ax-y,m"`, where m,n is the generated scaffold length and the motif position begins from A chain residue x to A chain residue y
+4. `mask_len` - The scaffold length of each segment which should be the same with `inpaint_seq`
+5. `motif_id` - The motif position which should be the same with `inpaint_seq`
+6. `max_mut`- Maximum residues can be mutated in the beginning.
+7. `step` - Total MCMC iteration steps.
+8. `temp_dir` - Temp folders for MCMC and seeding module results
+9. `final_des_dir` - Final output PDBs
+10. `reference` - Native extraction PDB
+11. `inp_num` - Total number of designs in each bash file
 
 ## ✏️ Citation
 
