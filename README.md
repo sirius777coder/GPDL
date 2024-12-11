@@ -9,7 +9,7 @@ GPDL is a deep learning method to **design novel and high quality scaffold backb
 ## 💻 Environment set-up
 
 ### Conda environment
-
+> We used the same environment from https://github.com/facebookresearch/esm
 ```
 # install esmfold and openfold 
 conda create -n gpdl python=3.8
