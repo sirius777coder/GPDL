@@ -1,9 +1,7 @@
-import sys, os, argparse, copy, subprocess, glob, pickle, json, tempfile, random
-# import time
+import sys, os, argparse, copy, subprocess, glob, pickle, json, tempfile, random, time
 from pathlib import Path
 import numpy as np
 from Bio import *
-# import gc
 import logging
 import torch
 import esm
@@ -14,7 +12,7 @@ from Bio import SeqIO
 
 import inference_v1,loss,mutate
 from inference_v1 import main
-# t_init=time.time()
+t_init=time.time()
 args = inference_v1.get_args()
 atoms = (args.atom).split(',')
 # load model
@@ -293,13 +291,4 @@ for init_seq_idx, des_seq in enumerate(sequences):
     logging.info(f'****** final_des{args.bb_suffix}_{num}: ,motif_RMSD:{final_rmsd}, plddt:{plddt} *******')
     t_end=time.time()
 
-if len(des_seqs) != len(fst_suc_step):
-    raise ValueError('different length of designed sequences with first success step list')
-else:
-    for i, seq in enumerate(fst_suc_step):
-        with open(f"{args.output_dir}/early_stop_steps_{i}", 'wb') as f:
-            f.write(f'{fst_suc_step[i]}')
-        
-    
-# t_total = t_end-t_init
-# logging.info(f'all time used {t_total} second')
+print(f"finished in {t_end-t_init} seconds")
