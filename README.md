@@ -12,8 +12,8 @@ GPDL is a deep learning method to **design novel and high quality scaffold backb
 > We used the same environment from https://github.com/facebookresearch/esm
 ```
 # install esmfold and openfold 
-conda create -n gpdl python=3.8
-conda activate gpdl
+conda create -n protein_design python=3.8
+conda activate protein_design
 conda install pip
 conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 conda install -c conda-forge biotite
