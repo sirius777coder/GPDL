@@ -27,7 +27,7 @@ conda activate esm_if
 conda install pytorch cudatoolkit=11.3 -c pytorch
 conda install pyg -c pyg -c conda-forge
 conda install pip
-pip install biotite
+pip install biotite==0.36.1
 pip install git+https://github.com/facebookresearch/esm.git
 ```
 

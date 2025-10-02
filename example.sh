@@ -5,11 +5,12 @@ conda activate gpdl
 # parameters and paths 
 protein_name="2FYD"
 dir_name="2FYD" # for different length scale
+
 inpaint_seq="50,D297-311,50"
 mask_len="50,50"
 motif_id="D297-311"
 max_mut=15
-step=1500
+step=100
 
 
 temp_dir="temp/${protein_name}"
@@ -17,7 +18,7 @@ temp_dir_inpaint="${temp_dir}/inpaint"
 temp_dir_hal="${temp_dir}/hal"
 final_des_dir="./final_design/${dir_name}"
 reference="./${protein_name}.pdb"
-inp_num=100
+inp_num=2
 if_num=1
 hal_num=1
 if [ ! -d $temp_dir_inpaint ]; then
