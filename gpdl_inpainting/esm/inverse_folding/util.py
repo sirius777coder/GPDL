@@ -9,7 +9,7 @@ import math
 import biotite.structure
 from biotite.structure.io import pdbx, pdb
 from biotite.structure.residues import get_residues
-from biotite.structure import filter_backbone
+from biotite.structure import filter_amino_acids
 from biotite.structure import get_chains
 from biotite.sequence import ProteinSequence
 import numpy as np
@@ -23,6 +23,29 @@ from typing import Sequence, Tuple, List
 
 from esm.data import BatchConverter
 
+
+def filter_backbone(array):
+    """
+    Patch from biotite old version backbone
+    Filter all peptide backbone atoms of one array.
+
+    This includes the "N", "CA" and "C" atoms of amino acids.
+
+    Parameters
+    ----------
+    array : AtomArray or AtomArrayStack
+        The array to be filtered.
+
+    Returns
+    -------
+    filter : ndarray, dtype=bool
+        This array is `True` for all indices in `array`, where the atom
+        as an backbone atom.
+    """
+    return ( ((array.atom_name == "N") |
+              (array.atom_name == "CA") |
+              (array.atom_name == "C")) &
+              filter_amino_acids(array) )
 
 def load_structure(fpath, chain=None):
     """
