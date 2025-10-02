@@ -15,15 +15,15 @@ import torch
 
 import sys
 sys.path.append("./gpdl_inpainting")
-import esm
-import esm.inverse_folding
+import gpdl_inpainting.esm as esm
+import gpdl_inpainting.esm.inverse_folding as inverse_folding
 
 
 def sample_seq_singlechain(model, alphabet, args):
     if torch.cuda.is_available() and not args.nogpu:
         model = model.cuda()
         print("Transferred model to GPU")
-    coords, native_seq = esm.inverse_folding.util.load_coords(args.pdbfile, args.chain)
+    coords, native_seq = inverse_folding.util.load_coords(args.pdbfile, args.chain)
     print('Native sequence loaded from structure file:')
     print(native_seq)
 
@@ -59,8 +59,8 @@ def sample_seq_multichain(model, alphabet, args):
     if torch.cuda.is_available() and not args.nogpu:
         model = model.cuda()
         print("Transferred model to GPU")
-    structure = esm.inverse_folding.util.load_structure(args.pdbfile)
-    coords, native_seqs = esm.inverse_folding.multichain_util.extract_coords_from_complex(structure)
+    structure = inverse_folding.util.load_structure(args.pdbfile)
+    coords, native_seqs = inverse_folding.multichain_util.extract_coords_from_complex(structure)
     target_chain_id = args.chain
     native_seq = native_seqs[target_chain_id]
     print('Native sequence loaded from structure file:')
@@ -73,7 +73,7 @@ def sample_seq_multichain(model, alphabet, args):
     with open(args.outpath, 'w') as f:
         for i in range(args.num_samples):
             print(f'\nSampling.. ({i+1} of {args.num_samples})')
-            sampled_seq = esm.inverse_folding.multichain_util.sample_sequence_in_complex(
+            sampled_seq = inverse_folding.multichain_util.sample_sequence_in_complex(
                     model, coords, target_chain_id, temperature=args.temperature)
             print('Sampled sequence:')
             print(sampled_seq)
@@ -125,7 +125,6 @@ def main():
     parser.add_argument("--inpaint_file", type=str, help="Fixed residue file from inpainting", default=None)
   
     args = parser.parse_args()
-
     model, alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
     model = model.eval()
 

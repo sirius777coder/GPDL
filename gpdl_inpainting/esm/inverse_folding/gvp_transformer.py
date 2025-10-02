@@ -85,7 +85,7 @@ class GVPTransformerModel(nn.Module):
         )
         return logits, extra
     
-    def sample(self, coords, partial_seq=None, temperature=1.0, confidence=None):
+    def sample(self, coords, partial_seq=None, temperature=1.0, confidence=None, device=None):
         """
         Samples sequences based on multinomial sampling (no beam search).
 
@@ -100,10 +100,12 @@ class GVPTransformerModel(nn.Module):
         L = len(coords)
         # Convert to batch format
         batch_converter = CoordBatchConverter(self.decoder.dictionary)
-        batch_coords, confidence, _, _, padding_mask = (
-            batch_converter([(coords, confidence, None)])
-        )
+        # modified code
         device = next(self.parameters()).device
+        batch_coords, confidence, _, _, padding_mask = (
+            batch_converter([(coords, confidence, None)], device=device)
+        )
+
         batch_coords = batch_coords.to(device)
         padding_mask = padding_mask.to(device)
         confidence = confidence.to(device)
@@ -115,17 +117,19 @@ class GVPTransformerModel(nn.Module):
         if partial_seq is not None:
             for i, c in enumerate(partial_seq):
                 sampled_tokens[0, i+1] = self.decoder.dictionary.get_idx(c)
-        sampled_tokens = sampled_tokens.to(device)
+            
         # Save incremental states for faster sampling
         incremental_state = dict()
         
         # Run encoder only once
         encoder_out = self.encoder(batch_coords, padding_mask, confidence)
         
+        # Make sure all tensors are on the same device if a GPU is present
+        if device:
+            sampled_tokens = sampled_tokens.to(device)
+        
         # Decode one token at a time
         for i in range(1, L+1):
-            if sampled_tokens[0, i] != mask_idx:
-                continue
             logits, _ = self.decoder(
                 sampled_tokens[:, :i], 
                 encoder_out,
@@ -134,8 +138,10 @@ class GVPTransformerModel(nn.Module):
             logits = logits[0].transpose(0, 1)
             logits /= temperature
             probs = F.softmax(logits, dim=-1)
-            sampled_tokens[:, i] = torch.multinomial(probs, 1).squeeze(-1)
+            if sampled_tokens[0, i] == mask_idx:
+                sampled_tokens[:, i] = torch.multinomial(probs, 1).squeeze(-1)
         sampled_seq = sampled_tokens[0, 1:]
         
         # Convert back to string via lookup
         return ''.join([self.decoder.dictionary.get_tok(a) for a in sampled_seq])
+
