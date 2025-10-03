@@ -11,7 +11,6 @@ import sys
 import biotite.structure
 from biotite.structure.io import pdbx, pdb
 from biotite.structure.residues import get_residues
-from biotite.structure import filter_backbone
 from biotite.structure import get_chains
 from biotite.sequence import ProteinSequence
 import biotite.structure.io as strucio
