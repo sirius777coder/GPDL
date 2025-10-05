@@ -6,6 +6,14 @@
 
 GPDL is a deep learning method to **design novel and high quality scaffold backbone** given the desired motif residue topologies and sequences. Included in this code repository are two distinct methods, each offering a balance between generation speed and output quality.
 
+> [!NOTE]  
+>
+> You can also try our notebook in Colab. This is a **beta** version where bug reports and pull requests are especially welcomed. 
+> 
+> [<img src="https://colab.research.google.com/assets/colab-badge.svg">](https://colab.research.google.com/github/sirius777coder/GPDL/blob/main/GPDL_jupyter.ipynb)
+***
+
+
 ## 💻 Environment set-up
 
 ### Conda environment
