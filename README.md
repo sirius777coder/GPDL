@@ -10,7 +10,7 @@ GPDL is a deep learning method to **design novel and high quality scaffold backb
 >
 > You can also try our notebook in Colab without any dependency. 
 > 
-> [<img src="https://colab.research.google.com/assets/colab-badge.svg">](https://colab.research.google.com/github/sirius777coder/GPDL/blob/main/GPDL_jupyter.ipynb)
+> [<img src="https://colab.research.google.com/assets/colab-badge.svg">](https://colab.research.google.com/github/sirius777coder/GPDL/blob/main/GPDL_colab.ipynb)
 ***
 
 
