@@ -30,7 +30,7 @@ fi
 if [ ! -d $final_des_dir ]; then
     mkdir -p $final_des_dir
 fi
-python3 ./gpdl_inpainting/esm_inference_v2.py  \
+python3 ./gpdl_inpainting/esm_inference.py  \
     --inpaint_seq "${inpaint_seq}" \
     --input "${reference}" \
     --output_prefix "${temp_dir_inpaint}/${protein_name}" \
@@ -50,7 +50,7 @@ do
 
     # get the protein structure from hallucination
     conda activate protein_design
-    python3 ./gpdl_hallucination/hallucination_v1.py \
+    python3 ./gpdl_hallucination/hallucination.py \
         --pre_sequence "${temp_dir_inpaint}/${protein_name}_${i}_esmif.fasta" \
         --reference $reference \
         --output_dir $temp_dir_hal \
