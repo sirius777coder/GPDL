@@ -61,7 +61,7 @@ GPDL takes three-steps module by seeding-fix bb design-optimization in `example.
 9. `final_des_dir` - Final output PDBs
 10. `reference` - Native extraction PDB
 11. `inp_num` - Total number of designs in each bash file
-
+12. `bias_AA_jsonl` - Path to a dictionary which specifies AA composion bias if neededi, e.g. {A: -1.1, F: 0.7} would make A less likely and F more likely (the same as ProteinMPNN).
 ## ✏️ Citation
 
 If you use the framework in your research, please cite the following paper.

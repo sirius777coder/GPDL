@@ -181,6 +181,14 @@ else:
 
 des_seqs = []
 fst_suc_step = []
+bias_AA_jsonl= args.bias_AA_jsonl
+if bias_AA_jsonl is not None:
+    with open(args.bias_AA_jsonl, 'r') as json_file:
+        json_list = list(json_file)
+    for json_str in json_list:
+        bias_AA_dict = json.loads(json_str)
+else:
+    bias_AA_dict = None
 for init_seq_idx, des_seq in enumerate(sequences):
     traj = []
     num = init_seq_idx
@@ -218,7 +226,7 @@ for init_seq_idx, des_seq in enumerate(sequences):
             #introduce mutation
             sites=mutate.select_positions(plddts,n_mutation,dm_id, des_len, option='r')
             logging.info(f'mut{i} mutation sites: {sites}')
-            mut_seq=mutate.random_mutate(des_seq,sites)
+            mut_seq=mutate.random_mutate(des_seq,sites, bias_AA_dict=bias_AA_dict)
             logging.info(f'mut{i} seq: {mut_seq}')
 
             # seq = SeqRecord(Seq(mut_seq),id=f"mut{i}",description="")

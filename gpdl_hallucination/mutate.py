@@ -205,7 +205,7 @@ def BLOSUM_mutate(seq,sites):
         seq = seq[:p] + np.random.choice(list(sub_prob.keys()), p=list(sub_prob.values())) + seq[p+1:]
     return seq
 
-def random_mutate(seq,sites):
+def random_mutate(seq,sites, bias_AA_dict=None):
     # AA order.
     aas = np.array(list('ARNDCQEGHILKMFPSTWYV'))
     P_random = np.ones([20,20]) 
@@ -213,9 +213,23 @@ def random_mutate(seq,sites):
     for p in sites:
         current_aa = seq[p]
         idx = np.argwhere(aas==current_aa)[0][0]
-        sub_prob_renorm = P_random[:,idx] / P_random[:,idx].sum() # get subsitutation vector for that aa, and renormalise the vector.
-        sub_prob = {a:f for a, f in list(zip(aas, sub_prob_renorm))}
-        # print(current_aa, idx, P_random[:,idx],sub_prob_renorm)
-        # Make mutations.
-        seq = seq[:p] + np.random.choice(list(sub_prob.keys()), p=list(sub_prob.values())) + seq[p+1:]
+        if bias_AA_dict is None:
+            sub_prob_renorm = P_random[:,idx] / P_random[:,idx].sum() # get subsitutation vector for that aa, and renormalise the vector.
+            sub_prob = {a:f for a, f in list(zip(aas, sub_prob_renorm))}
+            # print(current_aa, idx, P_random[:,idx],sub_prob_renorm)
+            # Make mutations.
+            seq = seq[:p] + np.random.choice(list(sub_prob.keys()), p=list(sub_prob.values())) + seq[p+1:]
+        else:
+            # Create frequency-based probability matrix
+            freq_vector = np.array([0.0 for aa in aas])
+            for aa in aas:
+                if aa in bias_AA_dict.keys():
+                    freq_vector[np.argwhere(aas==aa)[0][0]] = bias_AA_dict[aa]
+            P_freq = np.tile(freq_vector, (20, 1)).T  # each column is the frequency vector
+            np.fill_diagonal(P_freq, 0)  # don't substitute to the same amino acid
+            
+            sub_prob_renorm = P_freq[:,idx] / P_freq[:,idx].sum() # get subsitutation vector for that aa, and renormalise the vector.
+            sub_prob = {a:f for a, f in list(zip(aas, sub_prob_renorm))}
+            # Make mutations.
+            seq = seq[:p] + np.random.choice(list(sub_prob.keys()), p=list(sub_prob.values())) + seq[p+1:]
     return seq
