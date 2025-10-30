@@ -68,12 +68,11 @@ If you use the framework in your research, please cite the following paper.
 
 ```
 @article {GPDL,
-    Author={Bo, Zhang and Kexin, Liu and Zhuoqi, Zheng and Yunfeiyang, Liu and Ting, Wei and Haifeng, Chen},  
-    title={Protein Language Model Supervised Precise and Efficient Protein Backbone Design Method},  
-    year={2023},
-    doi={10.1101/2023.10.26.564121},
-    url={https://www.biorxiv.org/content/10.1101/2023.10.26.564121v1},
-    journal={bioRxiv}
+    Author={Bo Zhang, Kexin Liu, Zhuoqi Zheng, Junjie Zhu, Zhengxin Li, Yunfeiyang Liu, Junxi Mu, Ting Wei, Hai-Feng Chen},  
+    title={Protein language model supervised motif-scaffolding design with GPDL},  
+    year={2025},
+    url={https://doi.org/10.1016/j.ijbiomac.2025.148441},
+    journal={International Journal of Biological Macromolecules}
 }
 ```
 
