@@ -141,12 +141,6 @@ def get_args():
         default=None,
         help="N,CA,C,O",
     )
-    parser.add_argument(
-        "--atom",
-        type=str,
-        default=None,
-        help="N,CA,C,O",
-    )
     parser.add_argument("--bias_AA_jsonl", type=str, default=None, help="Path to a dictionary which specifies AA composion bias if neededi, e.g. {A: -1.1, F: 0.7} would make A less likely and F more likely.")
     parser.add_argument(
         '--earlystop', 
